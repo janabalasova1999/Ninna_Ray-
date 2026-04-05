@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AvatarDisplay } from "@/components/AvatarDisplay";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Lock, Unlock, Crown, Sparkles, MessageCircleHeart,
@@ -543,7 +544,7 @@ export default function EBot() {
 
           {/* LEFT — Ninna Display + Controls */}
           <div className="lg:col-span-2 space-y-4">
-            <NinnaDisplay config={currentConfig} mood={mood} />
+            <AvatarDisplay userId={localUser?.id} compact={false} />
 
             {/* Ninna comment */}
             {ninnaComment?.comment && (
