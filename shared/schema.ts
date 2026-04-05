@@ -44,10 +44,28 @@ export const contentItems = pgTable("content_items", {
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+export const skins = pgTable("skins", {
+  id: serial("id").primaryKey(),
+  contentItemId: integer("content_item_id").notNull().references(() => contentItems.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  price: integer("price").default(0).notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const userWardrobe = pgTable("user_wardrobe", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  skinId: integer("skin_id").notNull().references(() => skins.id, { onDelete: "cascade" }),
+  isActive: boolean("is_active").default(false).notNull(),
+  acquiredAt: timestamp("acquired_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertContentItemSchema = createInsertSchema(contentItems).omit({ id: true, createdAt: true });
+export const insertSkinSchema = createInsertSchema(skins).omit({ id: true, createdAt: true });
+export const insertWardrobeSchema = createInsertSchema(userWardrobe).omit({ id: true, acquiredAt: true });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

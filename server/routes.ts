@@ -734,6 +734,27 @@ Analyzuj a vrať JSON (bez markdown, čistý JSON):
     }
   });
 
+  // ─── Skin Engine (Wardrobe) routes ─────────────────────────────────────
+  app.get("/api/skins", async (_req, res) => {
+    try {
+      const skins = await storage.getAllSkins?.() || [];
+      res.json(skins);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching skins" });
+    }
+  });
+
+  app.get("/api/user/:userId/wardrobe", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) return res.status(400).json({ message: "Invalid user ID" });
+      const wardrobe = await storage.getUserWardrobe?.(userId) || [];
+      res.json(wardrobe);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching wardrobe" });
+    }
+  });
+
   // Setup Vite/static serving (MUST be last, after all API routes)
   const isProd = process.env.NODE_ENV === "production";
   if (!isProd) {
