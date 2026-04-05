@@ -2,6 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+import { setupVite } from "./vite";
+import { serveStatic } from "./static";
 import OpenAI from "openai";
 import multer from "multer";
 import path from "path";
@@ -732,17 +734,13 @@ Analyzuj a vrať JSON (bez markdown, čistý JSON):
     }
   });
 
-  // Catch-all for client-side routing - must be last
-  app.use((req: Request, res: Response) => {
-    res.setHeader("Content-Type", "text/html");
-    const indexPath = path.join(import.meta.dirname, "..", "client", "index.html");
-    try {
-      const html = fs.readFileSync(indexPath, "utf-8");
-      res.status(200).send(html);
-    } catch (err) {
-      res.status(404).json({ message: "Not found" });
-    }
-  });
+  // Setup Vite/static serving (MUST be last, after all API routes)
+  const isProd = process.env.NODE_ENV === "production";
+  if (!isProd) {
+    await setupVite(httpServer, app);
+  } else {
+    serveStatic(app);
+  }
 
   return httpServer;
 }

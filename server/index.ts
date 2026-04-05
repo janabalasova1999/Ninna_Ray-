@@ -1,8 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { registerRoutes } from "./routes";
-import { setupVite } from "./vite";
-import { serveStatic } from "./static";
 import { createServer } from "http";
 
 declare module "express-session" {
@@ -78,13 +76,6 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
     throw err;
   });
-
-  const isProdMode = process.env.NODE_ENV === "production";
-  if (!isProdMode) {
-    await setupVite(httpServer, app);
-  } else {
-    serveStatic(app);
-  }
 
   const PORT = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(PORT, "0.0.0.0", () => {
