@@ -6,8 +6,6 @@ import OpenAI from "openai";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { isStripeConnected } from "./stripeClient";
-import { stripeService } from "./stripeService";
 
 const uploadDir = path.resolve(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -895,101 +893,6 @@ Vrať POUZE čistý JSON (bez markdown):
     } catch (err) {
       console.error("Analyze all error:", err);
       res.status(500).json({ message: "Internal error" });
-    }
-  });
-
-  // ─── Stripe / Payment routes ─────────────────────────────────────────────────
-
-  app.get("/api/stripe/status", async (_req, res) => {
-    const connected = await isStripeConnected();
-    res.json({ connected });
-  });
-
-  app.get("/api/stripe/products", async (_req, res) => {
-    try {
-      const connected = await isStripeConnected();
-      if (!connected) return res.json({ products: [], connected: false });
-      const products = await stripeService.listProductsWithPrices();
-      res.json({ products, connected: true });
-    } catch (err: any) {
-      console.error("[Stripe] products error:", err.message);
-      res.json({ products: [], connected: false, error: err.message });
-    }
-  });
-
-  app.post("/api/stripe/checkout", async (req, res) => {
-    try {
-      const connected = await isStripeConnected();
-      if (!connected) return res.status(503).json({ message: "Platby nejsou aktivní" });
-
-      const { priceId, userId } = req.body;
-      if (!priceId || !userId) return res.status(400).json({ message: "priceId a userId jsou povinné" });
-      if (typeof priceId !== "string" || !priceId.startsWith("price_")) return res.status(400).json({ message: "Neplatný formát priceId" });
-
-      const user = await storage.getUser(userId);
-      if (!user) return res.status(404).json({ message: "Uživatel nenalezen" });
-
-      let customerId = user.stripeCustomerId;
-      if (!customerId) {
-        const customer = await stripeService.createCustomer(user.name, { userId: String(user.id), chatCode: user.chatCode || '' });
-        customerId = customer.id;
-        await storage.updateStripeCustomerId(user.id, customerId);
-      }
-
-      const { getUncachableStripeClient } = await import("./stripeClient");
-      const stripe = await getUncachableStripeClient();
-      const price = await stripe.prices.retrieve(priceId);
-      const mode = price.recurring ? "subscription" : "payment";
-
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const session = await stripeService.createCheckoutSession(
-        customerId,
-        priceId,
-        `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        `${baseUrl}/payment/cancel`,
-        mode
-      );
-
-      res.json({ url: session.url });
-    } catch (err: any) {
-      console.error("[Stripe] checkout error:", err.message);
-      res.status(500).json({ message: "Chyba při vytváření platby" });
-    }
-  });
-
-  app.get("/api/stripe/subscription/:userId", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      if (isNaN(userId)) return res.status(400).json({ message: "Invalid userId" });
-
-      const user = await storage.getUser(userId);
-      if (!user?.stripeCustomerId) return res.json({ subscription: null });
-
-      const connected = await isStripeConnected();
-      if (!connected) return res.json({ subscription: null });
-
-      const subscription = await stripeService.getCustomerSubscriptions(user.stripeCustomerId);
-      res.json({ subscription });
-    } catch (err: any) {
-      console.error("[Stripe] subscription error:", err.message);
-      res.json({ subscription: null });
-    }
-  });
-
-  app.post("/api/stripe/portal", requireOwner, async (req, res) => {
-    try {
-      const connected = await isStripeConnected();
-      if (!connected) return res.status(503).json({ message: "Stripe není propojený" });
-
-      const { customerId } = req.body;
-      if (!customerId) return res.status(400).json({ message: "customerId je povinné" });
-
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const portalSession = await stripeService.createCustomerPortalSession(customerId, `${baseUrl}/manager`);
-      res.json({ url: portalSession.url });
-    } catch (err: any) {
-      console.error("[Stripe] portal error:", err.message);
-      res.status(500).json({ message: "Chyba při otevírání portálu" });
     }
   });
 
