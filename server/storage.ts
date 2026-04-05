@@ -1,4 +1,4 @@
-import { users, conversations, messages, contentItems, avatarElements, avatarInstances, type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, type ContentItem, type InsertContentItem } from "@shared/schema";
+import { users, conversations, messages, contentItems, type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, type ContentItem, type InsertContentItem } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -25,8 +25,6 @@ export interface IStorage {
   getContentItem(id: number): Promise<ContentItem | undefined>;
   deleteContentItem(id: number): Promise<void>;
   incrementContentUsage(id: number): Promise<void>;
-  getAllAvatarElements?(): Promise<any[]>;
-  getAvatarInstance?(userId: number): Promise<any | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {

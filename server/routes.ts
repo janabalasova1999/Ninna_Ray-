@@ -734,27 +734,6 @@ Analyzuj a vrať JSON (bez markdown, čistý JSON):
     }
   });
 
-  // ─── Virtual Twin: Avatar Elements & Instances ─────────────────────────────
-  app.get("/api/avatar-elements", async (_req, res) => {
-    try {
-      const elements = await storage.getAllAvatarElements?.() || [];
-      res.json(elements);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching avatar elements" });
-    }
-  });
-
-  app.get("/api/user/:userId/avatar", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      if (isNaN(userId)) return res.status(400).json({ message: "Invalid user ID" });
-      const instance = await storage.getAvatarInstance?.(userId);
-      res.json(instance || null);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching avatar instance" });
-    }
-  });
-
   // Setup Vite/static serving (MUST be last, after all API routes)
   const isProd = process.env.NODE_ENV === "production";
   if (!isProd) {

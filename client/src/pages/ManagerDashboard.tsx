@@ -578,73 +578,11 @@ function BroadcastTab() {
   );
 }
 
-// ─── Tab: Skins/Wardrobe ─────────────────────────────────────────────────────
-function SkinsTab() {
-  const demoSkin = {
-    id: 1,
-    name: "AI Founder",
-    price: 2999,
-    description: "Twin v roli AI Founder - prezentační look",
-    image: "@assets/IMG_6505_1775407468116.jpeg",
-  };
-
-  return (
-    <div className="flex-1 flex flex-col overflow-auto">
-      <div className="p-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-2">Virtuální Twin - Wardrobe Manager</h2>
-          <p className="text-neutral-400">Správa outfitů a skinů Twin Agenta</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Dostupné Skins */}
-          <div className="lg:col-span-2">
-            <h3 className="text-lg font-bold mb-4">Dostupné Skins</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden hover:border-emerald-500/50 transition-colors">
-                <div className="aspect-video bg-neutral-800 overflow-hidden">
-                  <img src="/images/demo-skin.jpg" alt={demoSkin.name} className="w-full h-full object-cover" />
-                </div>
-                <div className="p-4">
-                  <h4 className="font-bold mb-1">{demoSkin.name}</h4>
-                  <p className="text-neutral-400 text-xs mb-3">{demoSkin.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-emerald-400 font-bold">{(demoSkin.price / 100).toFixed(0)} Kč</span>
-                    <button className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded transition-colors text-white font-bold">
-                      Aktivovat
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="space-y-4">
-            <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
-              <p className="text-neutral-500 text-xs mb-1">CELKEM SKINŮ</p>
-              <p className="text-3xl font-bold">1</p>
-            </div>
-            <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
-              <p className="text-neutral-500 text-xs mb-1">UŽIVATELÉ S WARDROBE</p>
-              <p className="text-3xl font-bold">0</p>
-            </div>
-            <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
-              <p className="text-neutral-500 text-xs mb-1">AKTIVNÍ SKIN</p>
-              <p className="text-sm text-emerald-400 font-bold">Žádný</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 
 export default function ManagerDashboard() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<"customers" | "vault" | "trends" | "broadcast" | "skins">("customers");
+  const [activeTab, setActiveTab] = useState<"customers" | "vault" | "trends" | "broadcast">("customers");
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -668,7 +606,6 @@ export default function ManagerDashboard() {
     { id: "vault" as const, icon: "📦", label: "Vault" },
     { id: "trends" as const, icon: "📊", label: "Trendy" },
     { id: "broadcast" as const, icon: "📢", label: "Broadcast" },
-    { id: "skins" as const, icon: "👯‍♀️", label: "Twin" },
   ];
 
   return (
@@ -702,7 +639,6 @@ export default function ManagerDashboard() {
         {activeTab === "vault" && <VaultTab />}
         {activeTab === "trends" && <TrendsTab />}
         {activeTab === "broadcast" && <BroadcastTab />}
-        {activeTab === "skins" && <SkinsTab />}
       </div>
     </div>
   );
