@@ -578,11 +578,34 @@ function BroadcastTab() {
   );
 }
 
+// ─── Tab: Skins/Wardrobe ─────────────────────────────────────────────────────
+function SkinsTab() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6">
+      <div className="text-center">
+        <div className="text-9xl mb-4">👯‍♀️</div>
+        <h2 className="text-2xl font-bold mb-2">Virtuální Twin</h2>
+        <p className="text-neutral-400">Správa outfitů a skinů Twin Agenta</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+        <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
+          <h3 className="font-bold mb-2">Dostupné Skins</h3>
+          <p className="text-neutral-500 text-sm">Žádné skins dosud není vytvořeno</p>
+        </div>
+        <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
+          <h3 className="font-bold mb-2">Uživatelé Wardrobe</h3>
+          <p className="text-neutral-500 text-sm">Žádní uživatelé dosud nemají skins</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 
 export default function ManagerDashboard() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<"customers" | "vault" | "trends" | "broadcast">("customers");
+  const [activeTab, setActiveTab] = useState<"customers" | "vault" | "trends" | "broadcast" | "skins">("customers");
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -606,6 +629,7 @@ export default function ManagerDashboard() {
     { id: "vault" as const, icon: "📦", label: "Vault" },
     { id: "trends" as const, icon: "📊", label: "Trendy" },
     { id: "broadcast" as const, icon: "📢", label: "Broadcast" },
+    { id: "skins" as const, icon: "👯‍♀️", label: "Twin" },
   ];
 
   return (
@@ -639,6 +663,7 @@ export default function ManagerDashboard() {
         {activeTab === "vault" && <VaultTab />}
         {activeTab === "trends" && <TrendsTab />}
         {activeTab === "broadcast" && <BroadcastTab />}
+        {activeTab === "skins" && <SkinsTab />}
       </div>
     </div>
   );
