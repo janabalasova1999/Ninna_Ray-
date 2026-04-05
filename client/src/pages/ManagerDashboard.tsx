@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
-import demoSkinImg from "@assets/IMG_6505_1775407468116.jpeg";
 
 type AiProfile = {
   status: "hot" | "warm" | "cold" | "new";
@@ -604,7 +603,7 @@ function SkinsTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden hover:border-emerald-500/50 transition-colors">
                 <div className="aspect-video bg-neutral-800 overflow-hidden">
-                  <img src={demoSkinImg} alt={demoSkin.name} className="w-full h-full object-cover" />
+                  <img src="/images/demo-skin.jpg" alt={demoSkin.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="p-4">
                   <h4 className="font-bold mb-1">{demoSkin.name}</h4>

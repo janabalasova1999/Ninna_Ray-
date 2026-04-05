@@ -734,24 +734,24 @@ Analyzuj a vrať JSON (bez markdown, čistý JSON):
     }
   });
 
-  // ─── Skin Engine (Wardrobe) routes ─────────────────────────────────────
-  app.get("/api/skins", async (_req, res) => {
+  // ─── Virtual Twin: Avatar Elements & Instances ─────────────────────────────
+  app.get("/api/avatar-elements", async (_req, res) => {
     try {
-      const skins = await storage.getAllSkins?.() || [];
-      res.json(skins);
+      const elements = await storage.getAllAvatarElements?.() || [];
+      res.json(elements);
     } catch (err) {
-      res.status(500).json({ message: "Error fetching skins" });
+      res.status(500).json({ message: "Error fetching avatar elements" });
     }
   });
 
-  app.get("/api/user/:userId/wardrobe", async (req, res) => {
+  app.get("/api/user/:userId/avatar", async (req, res) => {
     try {
       const userId = parseInt(req.params.userId);
       if (isNaN(userId)) return res.status(400).json({ message: "Invalid user ID" });
-      const wardrobe = await storage.getUserWardrobe?.(userId) || [];
-      res.json(wardrobe);
+      const instance = await storage.getAvatarInstance?.(userId);
+      res.json(instance || null);
     } catch (err) {
-      res.status(500).json({ message: "Error fetching wardrobe" });
+      res.status(500).json({ message: "Error fetching avatar instance" });
     }
   });
 
