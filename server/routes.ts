@@ -2436,6 +2436,32 @@ Jméno (name) musí být v češtině, výstižné a poetické (např. "Červen�
     }
   });
 
+  // GET /api/user/payments — zobrazit si svoje platby
+  app.get("/api/user/payments", async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
+
+      const payments = await storage.getPaymentsByUser(userId);
+      const result = payments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        amountCzk: Math.round(p.amount / 100),
+        currency: p.currency,
+        status: p.status,
+        contentItemId: p.contentItemId,
+        stripeSessionId: p.stripeSessionId,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      }));
+
+      res.json({ payments: result });
+    } catch (err: any) {
+      console.error("[Payments] get error:", err.message);
+      res.status(500).json({ message: "Chyba při načítání tvých plateb" });
+    }
+  });
+
   // ─── Manager Subscription Health Routes ─────────────────────────────────
 
   // GET /api/manager/subscription-health — přehled churn rizika
