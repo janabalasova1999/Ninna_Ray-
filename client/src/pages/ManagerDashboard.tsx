@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
+import demoSkinImg from "@assets/IMG_6505_1775407468116.jpeg";
 
 type AiProfile = {
   status: "hot" | "warm" | "cold" | "new";
@@ -580,21 +581,60 @@ function BroadcastTab() {
 
 // ─── Tab: Skins/Wardrobe ─────────────────────────────────────────────────────
 function SkinsTab() {
+  const demoSkin = {
+    id: 1,
+    name: "AI Founder",
+    price: 2999,
+    description: "Twin v roli AI Founder - prezentační look",
+    image: "@assets/IMG_6505_1775407468116.jpeg",
+  };
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6">
-      <div className="text-center">
-        <div className="text-9xl mb-4">👯‍♀️</div>
-        <h2 className="text-2xl font-bold mb-2">Virtuální Twin</h2>
-        <p className="text-neutral-400">Správa outfitů a skinů Twin Agenta</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
-        <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
-          <h3 className="font-bold mb-2">Dostupné Skins</h3>
-          <p className="text-neutral-500 text-sm">Žádné skins dosud není vytvořeno</p>
+    <div className="flex-1 flex flex-col overflow-auto">
+      <div className="p-8">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-2">Virtuální Twin - Wardrobe Manager</h2>
+          <p className="text-neutral-400">Správa outfitů a skinů Twin Agenta</p>
         </div>
-        <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
-          <h3 className="font-bold mb-2">Uživatelé Wardrobe</h3>
-          <p className="text-neutral-500 text-sm">Žádní uživatelé dosud nemají skins</p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Dostupné Skins */}
+          <div className="lg:col-span-2">
+            <h3 className="text-lg font-bold mb-4">Dostupné Skins</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden hover:border-emerald-500/50 transition-colors">
+                <div className="aspect-video bg-neutral-800 overflow-hidden">
+                  <img src={demoSkinImg} alt={demoSkin.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="p-4">
+                  <h4 className="font-bold mb-1">{demoSkin.name}</h4>
+                  <p className="text-neutral-400 text-xs mb-3">{demoSkin.description}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-400 font-bold">{(demoSkin.price / 100).toFixed(0)} Kč</span>
+                    <button className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded transition-colors text-white font-bold">
+                      Aktivovat
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="space-y-4">
+            <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
+              <p className="text-neutral-500 text-xs mb-1">CELKEM SKINŮ</p>
+              <p className="text-3xl font-bold">1</p>
+            </div>
+            <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
+              <p className="text-neutral-500 text-xs mb-1">UŽIVATELÉ S WARDROBE</p>
+              <p className="text-3xl font-bold">0</p>
+            </div>
+            <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
+              <p className="text-neutral-500 text-xs mb-1">AKTIVNÍ SKIN</p>
+              <p className="text-sm text-emerald-400 font-bold">Žádný</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
