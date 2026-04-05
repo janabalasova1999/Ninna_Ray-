@@ -29,8 +29,6 @@ type Message = {
   createdAt: string;
 };
 
-const AGENCY_PASSWORD = "ninna2025";
-
 export default function Agency() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem("agency_auth") === "1");
   const [pwInput, setPwInput] = useState("");
@@ -41,11 +39,21 @@ export default function Agency() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  const login = () => {
-    if (pwInput === AGENCY_PASSWORD) {
-      sessionStorage.setItem("agency_auth", "1");
-      setAuthed(true);
-    } else {
+  const login = async () => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pwInput, role: "agency" }),
+      });
+      if (res.ok) {
+        sessionStorage.setItem("agency_auth", "1");
+        setAuthed(true);
+      } else {
+        setPwError(true);
+        setTimeout(() => setPwError(false), 1500);
+      }
+    } catch {
       setPwError(true);
       setTimeout(() => setPwError(false), 1500);
     }

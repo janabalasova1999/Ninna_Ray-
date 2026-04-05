@@ -18,6 +18,7 @@ export function useChat({ userId }: UseChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   // Store the active conversation ID
   const conversationIdRef = useRef<number | null>(null);
 
@@ -79,6 +80,7 @@ export function useChat({ userId }: UseChatProps) {
     // We don't set setIsTyping(true) immediately here anymore
     // It will be set after the random initial delay from the server
 
+    setConnectionError(null);
     try {
       const res = await fetch(`/api/conversations/${conversationIdRef.current}/messages`, {
         method: "POST",
@@ -86,11 +88,11 @@ export function useChat({ userId }: UseChatProps) {
         body: JSON.stringify({ content }),
       });
 
-      if (!res.ok) throw new Error("Failed to send");
+      if (!res.ok) throw new Error("Chyba serveru " + res.status);
 
       // Handle SSE Stream
       const reader = res.body?.getReader();
-      if (!reader) throw new Error("No reader");
+      if (!reader) throw new Error("Chyba připojení");
 
       const decoder = new TextDecoder();
       let aiResponseText = "";
@@ -149,11 +151,14 @@ export function useChat({ userId }: UseChatProps) {
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Message failed", err);
       setIsTyping(false);
+      setConnectionError(err?.message || "Chyba připojení — zkus to znovu");
     }
   };
+
+  const clearError = () => setConnectionError(null);
 
   return {
     messages,
@@ -161,5 +166,7 @@ export function useChat({ userId }: UseChatProps) {
     isTyping,
     initConversation,
     activeConversationId,
+    connectionError,
+    clearError,
   };
 }

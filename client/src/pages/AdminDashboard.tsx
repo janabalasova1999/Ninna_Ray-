@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
@@ -60,7 +60,8 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-type Tab = "overview" | "users" | "conversations";
+type Tab = "overview" | "users" | "conversations" | "avatar";
+type AvatarElement = { id: number; contentItemId: number; elementType: string; name: string; previewUrl: string | null; metadata: Record<string, any>; contentItem: { id: number; filename: string; originalName: string; mimeType: string } | null };
 
 export default function AdminDashboard() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -104,6 +105,47 @@ export default function AdminDashboard() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  const { data: avatarElements = [], refetch: refetchElements } = useQuery<AvatarElement[]>({
+    queryKey: ["/api/avatar/elements/all"],
+    enabled: authed === true && tab === "avatar",
+    queryFn: () => fetch("/api/avatar/elements/all").then(r => r.json()).then(d => d.elements || []),
+  });
+
+  const { data: contentItems = [] } = useQuery<{ id: number; originalName: string; filename: string; mimeType: string }[]>({
+    queryKey: ["/api/vault/items"],
+    enabled: authed === true && tab === "avatar",
+    queryFn: () => fetch("/api/vault/items").then(r => r.json()),
+  });
+
+  const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const [analyzeResult, setAnalyzeResult] = useState<string | null>(null);
+
+  const analyzePhotoMutation = useMutation({
+    mutationFn: async (contentItemId: number) => {
+      const res = await fetch("/api/avatar/analyze-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentItemId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setAnalyzeResult(`Extrahováno ${data.createdElements.length} prvků: ${data.createdElements.map((e: any) => e.name).join(", ")}`);
+      refetchElements();
+    },
+    onError: (err: any) => setAnalyzeResult(`Chyba: ${err.message}`),
+  });
+
+  const deleteElementMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/avatar/elements/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => refetchElements(),
+  });
+
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setAuthed(false);
@@ -118,6 +160,7 @@ export default function AdminDashboard() {
     { id: "overview", label: "Přehled", icon: "📊" },
     { id: "users", label: "Uživatelé", icon: "👥" },
     { id: "conversations", label: "Konverzace", icon: "💬" },
+    { id: "avatar", label: "Virtual Twin", icon: "✨" },
   ];
 
   return (
@@ -316,6 +359,111 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ─── VIRTUAL TWIN TAB ─────────────────────────────────────────────── */}
+        {tab === "avatar" && (
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-white mb-1">✨ Virtual Twin Skin Engine</h2>
+              <p className="text-neutral-500 text-sm">Správa vizuálních prvků (skinů) pro zákazníky. Analyzuj fotky AI modelem a extrahuj elementy pro šatník.</p>
+            </div>
+
+            {/* Analyze Photo Section */}
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 space-y-3">
+              <h3 className="font-semibold text-white text-sm">🔬 Analýza fotografie (GPT-4o Vision)</h3>
+              <p className="text-neutral-500 text-xs">Vyber fotku ze trezoru a AI automaticky extrahuje vizuální prvky (oblečení, vlasy, pozadí, výraz, doplněk).</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {contentItems.filter(c => c.mimeType.startsWith("image/")).slice(0, 20).map(item => (
+                  <div key={item.id} className="flex items-center justify-between bg-neutral-800/50 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-pink-400 text-sm shrink-0">🖼</span>
+                      <span className="text-sm text-neutral-300 truncate">{item.originalName}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setAnalyzingId(item.id);
+                        setAnalyzeResult(null);
+                        analyzePhotoMutation.mutate(item.id);
+                      }}
+                      disabled={analyzePhotoMutation.isPending}
+                      className="shrink-0 ml-2 px-3 py-1 text-xs bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+                      data-testid={`button-analyze-${item.id}`}
+                    >
+                      {analyzePhotoMutation.isPending && analyzingId === item.id ? "Analyzuji..." : "Analyzovat"}
+                    </button>
+                  </div>
+                ))}
+                {contentItems.filter(c => c.mimeType.startsWith("image/")).length === 0 && (
+                  <p className="text-neutral-600 text-sm col-span-2">Žádné fotky v trezoru</p>
+                )}
+              </div>
+              {analyzeResult && (
+                <div className="bg-violet-950/30 border border-violet-500/30 rounded-lg p-3 text-sm text-violet-300">
+                  ✅ {analyzeResult}
+                </div>
+              )}
+            </div>
+
+            {/* Elements List */}
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-white text-sm">🎨 Dostupné Avatar Elementy ({avatarElements.length})</h3>
+                <button onClick={() => refetchElements()} className="text-xs text-neutral-500 hover:text-white transition-colors">↻ Obnovit</button>
+              </div>
+              {avatarElements.length === 0 ? (
+                <p className="text-neutral-600 text-sm text-center py-8">Zatím žádné elementy. Analyzuj fotky výše.</p>
+              ) : (
+                <div className="space-y-2">
+                  {["outfit", "hair", "background", "expression", "accessory"].map(type => {
+                    const typeElements = avatarElements.filter(e => e.elementType === type);
+                    if (typeElements.length === 0) return null;
+                    const typeLabels: Record<string, string> = { outfit: "👗 Oblečení", hair: "💇 Vlasy", background: "🖼 Pozadí", expression: "😊 Výraz", accessory: "💎 Doplněk" };
+                    return (
+                      <div key={type}>
+                        <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1.5 mt-3">{typeLabels[type]} ({typeElements.length})</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {typeElements.map(el => (
+                            <div key={el.id} className="flex items-center gap-3 bg-neutral-800/50 rounded-lg p-2.5">
+                              {el.previewUrl && (
+                                <img src={el.previewUrl} alt={el.name} className="w-10 h-10 rounded object-cover shrink-0 opacity-80" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm text-white font-medium truncate">{el.name}</p>
+                                <p className="text-xs text-neutral-500 truncate">{el.contentItem?.originalName || `Foto #${el.contentItemId}`}</p>
+                              </div>
+                              <button
+                                onClick={() => deleteElementMutation.mutate(el.id)}
+                                disabled={deleteElementMutation.isPending}
+                                className="text-neutral-600 hover:text-red-400 transition-colors text-sm shrink-0"
+                                title="Smazat"
+                                data-testid={`button-delete-element-${el.id}`}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-amber-950/20 border border-amber-500/20 rounded-xl p-4">
+              <h4 className="text-amber-400 font-semibold text-sm mb-2">📋 Jak funguje Virtual Twin Engine?</h4>
+              <ol className="text-neutral-400 text-xs space-y-1.5 list-decimal list-inside">
+                <li>Zákazník si zakoupí fotku Ninny přes chat (Stripe PPV)</li>
+                <li>Owner analyzuje fotku pomocí GPT-4o Vision → extrahuje vizuální prvky</li>
+                <li>Prvky se uloží jako "skiny" dostupné zákazníkovi v šatníku (/avatar)</li>
+                <li>Zákazník si vybere skiny z různých kategorií a uloží konfiguraci</li>
+                <li>AI chat ví o preferencích zákazníka a personalizuje komunikaci</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

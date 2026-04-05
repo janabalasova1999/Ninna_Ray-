@@ -11,6 +11,8 @@ import ManagerDashboard from "@/pages/ManagerDashboard";
 import Payment from "@/pages/Payment";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
+import AvatarCustomizer from "@/pages/AvatarCustomizer";
+import EBot from "@/pages/EBot";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,12 +20,14 @@ function Router() {
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/chat" component={Chat} />
+      <Route path="/bot" component={EBot} />
       <Route path="/agent" component={AgentDashboard} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/manager" component={ManagerDashboard} />
       <Route path="/payment" component={Payment} />
       <Route path="/payment/success" component={PaymentSuccess} />
       <Route path="/payment/cancel" component={PaymentCancel} />
+      <Route path="/avatar" component={AvatarCustomizer} />
       <Route component={NotFound} />
     </Switch>
   );

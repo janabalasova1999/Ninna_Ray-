@@ -1,0 +1,172 @@
+========================================
+AI E-BOT SYSTEM – IMPLEMENTAČNÍ SPEC
+========================================
+
+CÍL:
+Vytvořit funkci „Ninna e-bot“, která se odemkne pouze po zaplacení předplatného.
+Bot je vizuální a interaktivní reprezentace Niny, kterou si user postupně upravuje pouze na základě zakoupeného obsahu.
+
+----------------------------------------
+CORE PRINCIPY (NEPORUŠITELNÉ)
+----------------------------------------
+
+1. Existuje pouze jedna postava: Ninna.
+2. Ninna má pevnou identitu (obličej, vlasy, styl, proporce).
+3. Ninna je vždy stylizovaná malá avatar verze (ne realistická, ne jiná osoba).
+4. Nesmí vzniknout žádná jiná postava ani variace mimo tuto identitu.
+5. Měnit se smí pouze:
+   - oblečení
+   - doplňky
+   - póza
+   - výraz
+   A to výhradně z odemčených assetů.
+
+----------------------------------------
+ACCESS LOGIKA
+----------------------------------------
+
+FREE USER:
+- má přístup pouze k chatu
+- AI manager prodává obsah
+- žádný avatar, žádný bot
+
+SUBSCRIPTION USER:
+- odemkne se „Ninna e-bot“
+- vytvoří se bot_state
+- zobrazí se default Ninna
+
+----------------------------------------
+DEFAULT NINNA (PO SUB)
+----------------------------------------
+
+- Základní outfit: spodní prádlo (kalhotky + podprsenka)
+- Toto je jediný výchozí stav
+- Žádné další úpravy zdarma
+
+CÍL:
+User má pocit:
+„mám ji, ale můžu ji vylepšit“
+
+----------------------------------------
+ASSET SYSTEM
+----------------------------------------
+
+Každý produkt obsahuje asset_tags.
+
+Při nákupu:
+1. načti asset_tags
+2. najdi odpovídající avatar_assets
+3. ulož do user_unlocked_assets
+
+Bez nákupu:
+- asset NEEXISTUJE pro usera
+
+----------------------------------------
+RENDER PRAVIDLA
+----------------------------------------
+
+- Zobrazuj pouze assety, které user vlastní
+- Pokud asset není odemčen:
+  → NESMÍ se zobrazit
+  → NESMÍ se simulovat
+  → NESMÍ se nahrazovat
+
+- Pokud user nic nevlastní:
+  → zobraz pouze default_underwear_set
+
+- Pokud něco chybí:
+  → ukaž jako LOCKED (ne generovat náhradu)
+
+----------------------------------------
+CUSTOMIZACE
+----------------------------------------
+
+User může:
+- přepínat outfit pouze z odemčených assetů
+- vybírat varianty (swipe / klik)
+
+User nemůže:
+- vytvářet vlastní vzhled
+- kombinovat neexistující assety
+- používat nic mimo nákupy
+
+----------------------------------------
+BOT BEHAVIOR
+----------------------------------------
+
+Bot má přístup k:
+- seznamu nákupů
+- seznamu odemčených assetů
+
+Bot:
+- reaguje na to, co user vlastní
+- používá konkrétní odkazy na outfity
+
+Příklad:
+"hej… dneska jsem jen v základu 😏
+ale mohl bys mě trochu vylepšit"
+
+NEBO:
+"to černý, cos mi vzal… chceš mě v tom?"
+
+----------------------------------------
+UPSELL LOGIKA
+----------------------------------------
+
+Bot detekuje:
+- co user má
+- co user nemá
+
+A přirozeně nabízí:
+
+"mám i jinou verzi… chceš ji vidět?"
+
+→ klik → paywall → purchase
+
+----------------------------------------
+SUBSCRIPTION EXPIRE
+----------------------------------------
+
+Po skončení:
+
+- bot zmizí NEBO se zamkne
+- nelze upravovat
+- nelze používat
+
+ALE:
+- progress zůstává uložený
+
+→ návrat = návrat ke stejnému botovi
+
+----------------------------------------
+ZÁKAZY (DŮLEŽITÉ)
+----------------------------------------
+
+- zákaz generování nových outfitů bez assetu
+- zákaz změny identity Niny
+- zákaz přidávání obsahu zdarma
+- zákaz kreativních odchylek mimo systém
+
+Pokud něco neexistuje:
+→ NEZOBRAZIT
+
+----------------------------------------
+MVP IMPLEMENTACE
+----------------------------------------
+
+- žádné 3D nutné
+- použít obrázkové assety (outfit varianty)
+- přepínání assetů podle unlocků
+- chat napojený na purchases
+
+----------------------------------------
+HLAVNÍ PRINCIP
+----------------------------------------
+
+Ninna e-bot není dekorace.
+
+Je to:
+→ vizuální reprezentace toho,
+→ kolik do Niny user investoval
+
+========================================

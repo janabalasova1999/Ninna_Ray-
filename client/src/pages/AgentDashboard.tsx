@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cs } from "date-fns/locale";
 import { useLocation } from "wouter";
 
-type ConvUser = { id: number; name: string; messageCount: number } | null;
+type ConvUser = { id: number; name: string; messageCount: number; platform?: string } | null;
 type LastMsg = { id: number; role: string; content: string; createdAt: string } | null;
 type AgentConv = {
   id: number; userId: number; title: string; createdAt: string;
@@ -156,7 +156,20 @@ export default function AgentDashboard() {
               <button key={conv.id} onClick={() => setSelectedId(conv.id)}
                 className={`w-full text-left px-4 py-3 border-b border-neutral-800/50 hover:bg-neutral-800/40 transition-colors ${selectedId === conv.id ? "bg-neutral-800" : ""}`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-sm truncate">{conv.user?.name || `#${conv.userId}`}</span>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-semibold text-sm truncate">{conv.user?.name || `#${conv.userId}`}</span>
+                    {conv.user?.platform && conv.user.platform !== "direct" && (
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                        conv.user.platform === "instagram" ? "bg-pink-500/20 text-pink-400" :
+                        conv.user.platform === "telegram" ? "bg-blue-500/20 text-blue-400" :
+                        conv.user.platform === "facebook" ? "bg-indigo-500/20 text-indigo-400" :
+                        conv.user.platform === "onlyfans" ? "bg-cyan-500/20 text-cyan-400" :
+                        conv.user.platform === "fansly" ? "bg-violet-500/20 text-violet-400" :
+                        conv.user.platform === "twitter" ? "bg-sky-500/20 text-sky-400" :
+                        "bg-neutral-700 text-neutral-400"
+                      }`} data-testid={`platform-badge-${conv.id}`}>{conv.user.platform.toUpperCase()}</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 ml-2 shrink-0">
                     {conv.manualMode && (
                       <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full px-1.5 py-0.5 font-bold">
@@ -191,7 +204,17 @@ export default function AgentDashboard() {
                     {selectedConv.user?.name?.[0]?.toUpperCase() || "?"}
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">{selectedConv.user?.name || `User #${selectedConv.userId}`}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold text-sm">{selectedConv.user?.name || `User #${selectedConv.userId}`}</p>
+                      {selectedConv.user?.platform && selectedConv.user.platform !== "direct" && (
+                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
+                          selectedConv.user.platform === "instagram" ? "bg-pink-500/20 text-pink-400" :
+                          selectedConv.user.platform === "telegram" ? "bg-blue-500/20 text-blue-400" :
+                          selectedConv.user.platform === "onlyfans" ? "bg-cyan-500/20 text-cyan-400" :
+                          "bg-neutral-700 text-neutral-400"
+                        }`}>{selectedConv.user.platform}</span>
+                      )}
+                    </div>
                     <p className="text-xs text-neutral-500">{selectedConv.messageCount} zpráv</p>
                   </div>
                 </div>
