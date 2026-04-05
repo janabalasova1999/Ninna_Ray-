@@ -2451,6 +2451,7 @@ Jméno (name) musí být v češtině, výstižné a poetické (např. "Červen�
         status: p.status,
         contentItemId: p.contentItemId,
         stripeSessionId: p.stripeSessionId,
+        stripePaymentIntentId: p.stripePaymentIntentId,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
       }));
@@ -2459,6 +2460,29 @@ Jméno (name) musí být v češtině, výstižné a poetické (např. "Červen�
     } catch (err: any) {
       console.error("[Payments] get error:", err.message);
       res.status(500).json({ message: "Chyba při načítání tvých plateb" });
+    }
+  });
+
+  // GET /api/payment-by-stripe/:stripeId — najít payment ID podle Stripe charge ID
+  app.get("/api/payment-by-stripe/:stripeId", async (req, res) => {
+    try {
+      const { stripeId } = req.params;
+      const allPayments = await db.select().from(payments).where(eq(payments.stripePaymentIntentId, stripeId));
+      
+      if (allPayments.length === 0) {
+        return res.status(404).json({ message: `Platba s Stripe ID ${stripeId} nenalezena` });
+      }
+
+      const p = allPayments[0];
+      res.json({
+        id: p.id,
+        amount: Math.round(p.amount / 100),
+        status: p.status,
+        contentItemId: p.contentItemId,
+        userId: p.userId,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 
