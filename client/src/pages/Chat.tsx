@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useChat } from "@/hooks/use-chat";
 import { ChatBubble } from "@/components/ChatBubble";
+import { AvatarDisplay } from "@/components/AvatarDisplay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, LogOut, ChevronLeft, Crown, Mic, Loader2, Wand2, Bot } from "lucide-react";
@@ -137,6 +138,8 @@ export default function Chat() {
             End-to-end encrypted
           </span>
         </div>
+
+        <AvatarDisplay userId={user?.id} compact={false} />
         
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
