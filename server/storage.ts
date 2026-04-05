@@ -378,10 +378,27 @@ export class DatabaseStorage implements IStorage {
     if (!instance) {
       instance = await this.createAvatarInstance(userId);
     }
-    await db.update(avatarInstances)
-      .set({ botEnabled: true, updatedAt: new Date() })
-      .where(eq(avatarInstances.userId, userId));
-    console.log(`[E-Bot] Bot enabled for user #${userId}`);
+    
+    // Pokud nemá ještě žádnou konfiguraci, nastavit default outfit + expression
+    const current = (instance?.visualConfig as Record<string, any>) || {};
+    if (!current.outfit_preview && !current.expression_preview) {
+      const defaultConfig = {
+        ...current,
+        outfit_name: "Sexy pose",
+        outfit_preview: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='280' viewBox='0 0 200 280'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23ec4899'/%3E%3Cstop offset='100%25' style='stop-color:%23a21caf'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23grad)' width='200' height='280'/%3E%3Ccircle cx='100' cy='50' r='38' fill='%23fdbcb4'/%3E%3Cellipse cx='100' cy='150' rx='48' ry='65' fill='%23d946a6'/%3E%3Crect x='60' y='200' width='80' height='70' fill='%23a21caf' rx='8'/%3E%3Ccircle cx='70' cy='45' r='10' fill='%23000'/%3E%3Ccircle cx='130' cy='45' r='10' fill='%23000'/%3E%3Cpath d='M 85 65 Q 100 75 115 65' stroke='%23000' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E",
+        expression_name: "Flirty smile 😏",
+        expression_preview: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='280' viewBox='0 0 200 280'%3E%3Crect fill='%23fdbcb4' width='200' height='140'/%3E%3Ccircle cx='65' cy='55' r='14' fill='%23000'/%3E%3Ccircle cx='135' cy='55' r='14' fill='%23000'/%3E%3Cpath d='M 80 85 Q 100 105 120 85' stroke='%23d946a6' stroke-width='3.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E",
+      };
+      await db.update(avatarInstances)
+        .set({ botEnabled: true, visualConfig: defaultConfig, updatedAt: new Date() })
+        .where(eq(avatarInstances.userId, userId));
+      console.log(`[E-Bot] Bot enabled for user #${userId} with default outfit`);
+    } else {
+      await db.update(avatarInstances)
+        .set({ botEnabled: true, updatedAt: new Date() })
+        .where(eq(avatarInstances.userId, userId));
+      console.log(`[E-Bot] Bot enabled for user #${userId}`);
+    }
   }
 
   async disableBot(userId: number): Promise<void> {
