@@ -33,14 +33,20 @@ export class WebhookHandlers {
         const sessionId = session.id;
         const paymentIntentId = session.payment_intent;
 
+        console.log(`[Webhook] checkout.session.completed: sessionId=${sessionId}, paymentIntent=${paymentIntentId}`);
+
         try {
           const payment = await storage.getPaymentByStripeSession(sessionId);
+          console.log(`[Webhook] Payment lookup result:`, payment ? `Found #${payment.id}` : `NOT FOUND`);
+          
           if (payment) {
             await storage.updatePaymentStatus(payment.id, 'completed', paymentIntentId);
             await storage.addManagerLog('payment_success', `Platba #${payment.id} úspěšně dokončena, session: ${sessionId}`);
-            console.log(`[Webhook] Payment #${payment.id} completed successfully`);
+            console.log(`[Webhook] Payment #${payment.id} status updated to completed`);
 
             if (payment.userId) {
+              console.log(`[Webhook] Processing for userId=${payment.userId}, contentItemId=${payment.contentItemId}`);
+              
               if (payment.contentItemId) {
                 try {
                   await storage.autoCreateAvatarElements(payment.contentItemId);
@@ -49,6 +55,7 @@ export class WebhookHandlers {
                     payment.contentItemId,
                     payment.id
                   );
+                  console.log(`[Webhook] Unlocked ${unlockedCount} assets for user #${payment.userId}`);
                   if (unlockedCount > 0) {
                     await storage.addManagerLog(
                       'assets_unlocked',
@@ -61,6 +68,8 @@ export class WebhookHandlers {
               }
 
               const convs = await storage.getConversationsByUser(payment.userId);
+              console.log(`[Webhook] Found ${convs.length} conversations for user #${payment.userId}`);
+              
               if (convs.length > 0) {
                 const amountCzk = Math.round(payment.amount / 100);
                 let confirmMsg = `✅ Platba ${amountCzk} Kč přijata! Děkuji, miláčku 💋`;
@@ -72,11 +81,16 @@ export class WebhookHandlers {
                   }
                 }
                 await storage.createMessage(convs[0].id, "assistant", confirmMsg);
+                console.log(`[Webhook] Confirmation message sent to conversation #${convs[0].id}`);
+              } else {
+                console.warn(`[Webhook] No conversations found for user #${payment.userId} - cannot send confirmation!`);
               }
             }
+          } else {
+            console.warn(`[Webhook] Payment not found for session ${sessionId} - payment may not exist in DB yet`);
           }
         } catch (err: any) {
-          console.error('[Webhook] checkout.session.completed error:', err.message);
+          console.error('[Webhook] checkout.session.completed error:', err.message, err.stack);
           await storage.addManagerLog('payment_webhook_error', `Chyba při zpracování platby: ${err.message}`);
         }
         break;

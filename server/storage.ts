@@ -275,6 +275,11 @@ export class DatabaseStorage implements IStorage {
     return payment;
   }
 
+  async getPaymentById(paymentId: number): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+    return payment;
+  }
+
   async getPaymentStats(): Promise<{ totalRevenue: number; totalPayments: number; successfulPayments: number }> {
     const allPays = await db.select().from(payments);
     const successful = allPays.filter(p => p.status === "completed");

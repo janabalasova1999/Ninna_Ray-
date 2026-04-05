@@ -2462,6 +2462,58 @@ Jméno (name) musí být v češtině, výstižné a poetické (např. "Červen�
     }
   });
 
+  // POST /api/admin/payment-manual-complete — ručně dokončit platbu a poslat confirmation (OWNER ONLY)
+  app.post("/api/admin/payment-manual-complete", requireOwner, async (req, res) => {
+    try {
+      const { paymentId } = req.body;
+      if (!paymentId) return res.status(400).json({ message: "paymentId je povinné" });
+
+      const targetPayment = await storage.getPaymentById(parseInt(paymentId));
+      
+      if (!targetPayment) return res.status(404).json({ message: `Platba #${paymentId} nenalezena` });
+
+      // Update status to completed
+      await storage.updatePaymentStatus(targetPayment.id, 'completed', `manual-${Date.now()}`);
+      console.log(`[Admin] Manually completed payment #${targetPayment.id}`);
+
+      // Unlock assets
+      if (targetPayment.contentItemId) {
+        try {
+          await storage.autoCreateAvatarElements(targetPayment.contentItemId);
+          const unlockedCount = await storage.unlockAssetsForPayment(
+            targetPayment.userId,
+            targetPayment.contentItemId,
+            targetPayment.id
+          );
+          console.log(`[Admin] Unlocked ${unlockedCount} assets for user #${targetPayment.userId}`);
+        } catch (unlockErr: any) {
+          console.error('[Admin] Asset unlock error:', unlockErr.message);
+        }
+      }
+
+      // Send confirmation message
+      const convs = await storage.getConversationsByUser(targetPayment.userId);
+      if (convs.length > 0) {
+        const amountCzk = Math.round(targetPayment.amount / 100);
+        let confirmMsg = `✅ Platba ${amountCzk} Kč přijata! Děkuji, miláčku 💋`;
+        if (targetPayment.contentItemId) {
+          const item = await storage.getContentItem(targetPayment.contentItemId);
+          if (item) {
+            const isVideo = item.mimeType?.startsWith("video");
+            confirmMsg = `✅ Platba ${amountCzk} Kč přijata! Tady máš svůj exkluzivní ${isVideo ? "video" : "obsah"} 💋🔓\n\n[UNLOCKED_CONTENT:${targetPayment.contentItemId}]\n\n✨ Tohle se ti odemklo i v šatníku — mrkni na svojí Ninnu 😏`;
+          }
+        }
+        await storage.createMessage(convs[0].id, "assistant", confirmMsg);
+        console.log(`[Admin] Confirmation message sent to conversation #${convs[0].id}`);
+      }
+
+      res.json({ success: true, message: `Platba #${paymentId} ručně dokončena` });
+    } catch (err: any) {
+      console.error("[Admin] payment-manual-complete error:", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ─── Manager Subscription Health Routes ─────────────────────────────────
 
   // GET /api/manager/subscription-health — přehled churn rizika
