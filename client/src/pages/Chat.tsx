@@ -67,6 +67,39 @@ export default function Chat() {
 
   if (!user) return null;
 
+  // Jestli user nemá předplatné, přesměruj na payment
+  if (botStatus && !botStatus.isSubscribed) {
+    return (
+      <div className="flex flex-col h-screen bg-neutral-950 relative max-w-md mx-auto shadow-2xl overflow-hidden items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">🔐 Zamčeno</h1>
+            <p className="text-neutral-400">Chat s Ninnou je dostupný pouze pro předplacené členy</p>
+          </div>
+          <Button
+            onClick={() => setLocation("/payment")}
+            className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold px-8 py-6 text-lg rounded-xl"
+            data-testid="button-subscribe"
+          >
+            💜 Koupit Předplatné
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="text-neutral-400 hover:text-white"
+            data-testid="button-logout"
+          >
+            Odhlásit se
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-neutral-950 relative max-w-md mx-auto shadow-2xl overflow-hidden">
       <header className="flex items-center justify-between px-4 py-4 z-20 bg-black/60 backdrop-blur-xl border-b border-white/5 sticky top-0">
