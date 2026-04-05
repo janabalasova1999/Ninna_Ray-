@@ -172,7 +172,7 @@ export default function Chat() {
           </span>
         </div>
 
-        <AvatarDisplay compact={false} />
+        <AvatarDisplay userId={user?.id} compact={false} />
         
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
