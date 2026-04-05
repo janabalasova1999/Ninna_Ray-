@@ -45,3 +45,4 @@ integrations = ["javascript_openai_ai_integrations:2.0.0"]
 [userenv]
 
 [userenv.shared]
+NODE_ENV = "development"

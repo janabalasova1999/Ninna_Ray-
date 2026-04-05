@@ -73,6 +73,7 @@ async function sendToAgency(userId: number, message: string, role: string) {
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  console.log("[Routes] Starting registerRoutes...");
 
   // ─── Auth routes ────────────────────────────────────────────────────────────
 
@@ -735,12 +736,17 @@ Analyzuj a vrať JSON (bez markdown, čistý JSON):
   });
 
   // Setup Vite/static serving (MUST be last, after all API routes)
+  console.log("[Routes] About to setup Vite/static...");
   const isProd = process.env.NODE_ENV === "production";
+  console.log("[Routes] isProd:", isProd, "NODE_ENV:", process.env.NODE_ENV);
   if (!isProd) {
+    console.log("[Routes] Calling setupVite...");
     await setupVite(httpServer, app);
+    console.log("[Routes] setupVite completed");
   } else {
     serveStatic(app);
   }
 
+  console.log("[Routes] Returning httpServer");
   return httpServer;
 }
