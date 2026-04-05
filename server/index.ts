@@ -70,13 +70,6 @@ app.use((req, res, next) => {
 (async () => {
   const httpServer = createServer(app);
 
-  const isProdMode = process.env.NODE_ENV === "production";
-  if (!isProdMode) {
-    await setupVite(httpServer, app);
-  } else {
-    serveStatic(app);
-  }
-
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -85,6 +78,13 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
     throw err;
   });
+
+  const isProdMode = process.env.NODE_ENV === "production";
+  if (!isProdMode) {
+    await setupVite(httpServer, app);
+  } else {
+    serveStatic(app);
+  }
 
   const PORT = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(PORT, "0.0.0.0", () => {

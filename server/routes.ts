@@ -732,5 +732,17 @@ Analyzuj a vrať JSON (bez markdown, čistý JSON):
     }
   });
 
+  // Catch-all for client-side routing - must be last
+  app.use((req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/html");
+    const indexPath = path.join(import.meta.dirname, "..", "client", "index.html");
+    try {
+      const html = fs.readFileSync(indexPath, "utf-8");
+      res.status(200).send(html);
+    } catch (err) {
+      res.status(404).json({ message: "Not found" });
+    }
+  });
+
   return httpServer;
 }
