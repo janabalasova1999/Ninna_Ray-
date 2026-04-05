@@ -540,11 +540,17 @@ export default function EBot() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-5">
+        {/* Avatar Section - Visible on all devices */}
+        <div className="mb-6 flex justify-center">
+          <div className="w-full max-w-xs">
+            <AvatarDisplay userId={localUser?.id} compact={false} />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
           {/* LEFT — Ninna Display + Controls */}
           <div className="lg:col-span-2 space-y-4">
-            <AvatarDisplay userId={localUser?.id} compact={false} />
 
             {/* Ninna comment */}
             {ninnaComment?.comment && (
