@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Message {
@@ -22,6 +22,31 @@ export function useChat({ userId }: UseChatProps) {
   // Store the active conversation ID
   const conversationIdRef = useRef<number | null>(null);
 
+  // Periodically reload conversation messages (every 5 seconds)
+  // This ensures we see when webhook adds [UNLOCKED_CONTENT] markers
+  useEffect(() => {
+    if (!activeConversationId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const histRes = await fetch(`/api/conversations/${activeConversationId}`);
+        if (histRes.ok) {
+          const data = await histRes.json();
+          setMessages(data.messages.map((m: any) => ({
+            id: m.id.toString(),
+            role: m.role,
+            content: m.content,
+            isSeen: m.isSeen,
+          })));
+        }
+      } catch (err) {
+        console.error("Failed to reload messages:", err);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeConversationId]);
+
   // 1. Get or Create Conversation
   // We'll just use a single conversation for simplicity in this MVP
   const initConversation = useCallback(async () => {
@@ -43,7 +68,8 @@ export function useChat({ userId }: UseChatProps) {
            setMessages(data.messages.map((m: any) => ({
              id: m.id.toString(),
              role: m.role,
-             content: m.content
+             content: m.content,
+             isSeen: m.isSeen,
            })));
         }
       } else {
