@@ -2653,9 +2653,142 @@ function WeeklyReportTab() {
   );
 }
 
+// ─── Subscription Health Tab ──────────────────────────────────────────────────
+interface SubHealthUser {
+  userId: number;
+  userName: string;
+  churnRisk: "low" | "medium" | "high" | "critical";
+  riskScore: number;
+  riskFactors: string[];
+  daysSinceLastMessage: number;
+  subscriptionAge: number;
+  messageCount: number;
+  purchaseCount: number;
+  suggestedAction: string;
+}
+
+interface SubHealthReport {
+  totalSubscribers: number;
+  activeSubscribers: number;
+  atRiskSubscribers: number;
+  estimatedMRR: number;
+  estimatedARR: number;
+  churnCandidates: SubHealthUser[];
+  generatedAt: string;
+}
+
+function SubscriptionHealthTab() {
+  const { data: report, isLoading } = useQuery<SubHealthReport>({
+    queryKey: ["/api/manager/subscription-health"],
+    refetchInterval: 60000,
+    queryFn: () => fetch("/api/manager/subscription-health").then(r => r.json()),
+  });
+
+  const riskColor = (risk: string) => {
+    if (risk === "critical") return "text-red-400 bg-red-500/10 border-red-500/25";
+    if (risk === "high") return "text-orange-400 bg-orange-500/10 border-orange-500/25";
+    if (risk === "medium") return "text-amber-400 bg-amber-500/10 border-amber-500/25";
+    return "text-emerald-400 bg-emerald-500/10 border-emerald-500/25";
+  };
+
+  const riskLabel = (risk: string) => {
+    if (risk === "critical") return "Kritické";
+    if (risk === "high") return "Vysoké";
+    if (risk === "medium") return "Střední";
+    return "Nízké";
+  };
+
+  if (isLoading) return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-neutral-600 text-sm">Načítám přehled předplatného...</div>
+    </div>
+  );
+
+  if (!report) return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-neutral-600 text-sm">Žádná data</div>
+    </div>
+  );
+
+  return (
+    <div className="flex-1 overflow-auto p-4 space-y-6">
+      <div>
+        <h2 className="text-lg font-bold text-white mb-1">Zdraví předplatného</h2>
+        <p className="text-neutral-500 text-xs">Churn risk a MRR přehled</p>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 text-center" data-testid="kpi-total-subscribers">
+          <p className="text-2xl font-bold text-white">{report.totalSubscribers}</p>
+          <p className="text-[10px] text-neutral-500 mt-0.5">Celkem subscribers</p>
+        </div>
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 text-center" data-testid="kpi-active-subscribers">
+          <p className="text-2xl font-bold text-emerald-400">{report.activeSubscribers}</p>
+          <p className="text-[10px] text-neutral-500 mt-0.5">Aktivní</p>
+        </div>
+        <div className="bg-neutral-900 border border-orange-500/20 rounded-xl p-4 text-center" data-testid="kpi-at-risk">
+          <p className="text-2xl font-bold text-orange-400">{report.atRiskSubscribers}</p>
+          <p className="text-[10px] text-neutral-500 mt-0.5">Ohrožené odchodem</p>
+        </div>
+        <div className="bg-neutral-900 border border-violet-500/20 rounded-xl p-4 text-center" data-testid="kpi-mrr">
+          <p className="text-2xl font-bold text-violet-400">{Math.round(report.estimatedMRR / 100).toLocaleString()} Kč</p>
+          <p className="text-[10px] text-neutral-500 mt-0.5">Odhadované MRR</p>
+        </div>
+      </div>
+
+      {/* Churn Risk Table */}
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden" data-testid="churn-risk-table">
+        <div className="px-4 py-3 border-b border-neutral-800 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white">Zákazníci s rizikem odchodu</h3>
+          <span className="text-[10px] text-neutral-500">{report.churnCandidates.length} zákazníků</span>
+        </div>
+        {report.churnCandidates.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-neutral-600 text-sm">Žádní zákazníci s rizikem odchodu 🎉</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-neutral-800">
+            {report.churnCandidates.map((user) => (
+              <div key={user.userId} className="px-4 py-3 hover:bg-neutral-800/30 transition-colors" data-testid={`churn-row-${user.userId}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-white truncate">{user.userName}</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${riskColor(user.churnRisk)}`}>
+                        {riskLabel(user.churnRisk)} ({Math.round(user.riskScore * 100)}%)
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-1.5">
+                      {user.riskFactors.slice(0, 3).map((factor, i) => (
+                        <span key={i} className="text-[10px] text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded">
+                          {factor}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-xs text-amber-400/80">→ {user.suggestedAction}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] text-neutral-500">{user.daysSinceLastMessage}d bez aktivity</p>
+                    <p className="text-[10px] text-neutral-600">{user.purchaseCount} nákupů</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <p className="text-[10px] text-neutral-700 text-center">
+        Generováno: {new Date(report.generatedAt).toLocaleString("cs-CZ")}
+      </p>
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "customers" | "vault" | "trends" | "broadcast" | "payments" | "market" | "analytics" | "report" | "revenue" | "engagement" | "weekly">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "customers" | "vault" | "trends" | "broadcast" | "payments" | "market" | "analytics" | "report" | "revenue" | "engagement" | "weekly" | "subscriptions">("overview");
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [initialFilter, setInitialFilter] = useState<string | undefined>(undefined);
   const qc = useQueryClient();
@@ -2689,6 +2822,7 @@ export default function ManagerDashboard() {
     { id: "weekly" as const, icon: "📊", label: "Týdenní" },
     { id: "report" as const, icon: "📋", label: "Report" },
     { id: "market" as const, icon: "📈", label: "Trh" },
+    { id: "subscriptions" as const, icon: "💜", label: "Předplatné" },
   ];
 
   return (
@@ -2742,6 +2876,7 @@ export default function ManagerDashboard() {
         {activeTab === "weekly" && <WeeklyReportTab />}
         {activeTab === "report" && <ReportTab />}
         {activeTab === "market" && <MarketTab />}
+        {activeTab === "subscriptions" && <SubscriptionHealthTab />}
       </div>
     </div>
   );

@@ -25,7 +25,7 @@ Preferred communication style: Simple, everyday language. Czech language UI.
 - **Backend**: Express.js, TypeScript (tsx runtime).
 - **AI Integration**: OpenAI GPT-4o via Replit AI Integrations (streaming SSE).
 - **Authentication**: `express-session` with role-based access control.
-- **Database**: PostgreSQL with Drizzle ORM. Key tables include `users`, `conversations`, `messages`, `content_items`, `manager_actions`, `manager_log`.
+- **Database**: PostgreSQL with Drizzle ORM. Key tables include `users`, `conversations`, `messages`, `content_items`, `manager_actions`, `manager_log`, `clone_memories`, `content_recommendations`, `subscription_events`, `avatar_elements`, `avatar_instances`.
 - **Deployment**: Optimized for Autoscale, serving static files from `dist/public/` with SPA catch-all routing.
 
 ### AI Manager System Design
@@ -47,6 +47,14 @@ Preferred communication style: Simple, everyday language. Czech language UI.
 - **ChatBubble Payment Buttons**: Frontend renders payment markers as styled "Odemknout za X Kč" buttons with Stripe redirect.
 - **Webhook Handling**: Processes `checkout.session.completed` (marks payment completed + sends confirmation message to chat with `[UNLOCKED_CONTENT:id]`), `payment_intent.succeeded`, `payment_intent.payment_failed` events.
 - **Customer Flow**: Chat → AI tease → PPV content offer with Stripe button → Stripe Checkout → webhook → confirmation in chat + content unlock.
+
+### Ninna Virtual Clone System (v2)
+- **Clone Memory Engine** (`server/clone-memory.ts`): Emotional state machine, GPT-powered async memory consolidation triggered after every AI response. Extracts user facts (name, interests, personality) and stores them with importance scoring in `clone_memories` table. `buildMemoryContext()` injects memory into the AI system prompt for personalized responses. Every 3rd message triggers full GPT extraction; others use quick regex.
+- **Smart Content Recommendations** (`server/recommendation-engine.ts`): AI + heuristic scoring generates personalized content suggestions based on purchase history, categories and behavior. Stored in `content_recommendations` table.
+- **Subscription Expiry Tracker** (`server/subscription-tracker.ts`): Computes per-user churn risk scores from 4 signals (inactivity, expiry proximity, purchase count, tier level). Manager dashboard tab "Předplatné" shows KPIs and churn risk table with suggested actions.
+- **Twin Tier System**: 3 subscription tiers (BASIC=1, VIP=2, PREMIUM=3) with 10 feature capability flags. EBot page shows tier badge, capabilities checklist, upgrade CTA.
+- **Memory Panel in EBot**: Users can see what Ninna remembers about them (expandable panel with delete capability per memory item).
+- **Recommendations Tab in EBot**: "Pro tebe" tab shows AI-curated content recommendations with match percentage.
 
 ### UI/UX
 - Utilizes Shadcn/ui (Radix primitives) for a modern and accessible interface.

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Lock, Unlock, Crown, Sparkles, MessageCircleHeart,
   Shirt, ImageIcon, Smile, Gem, Wand2, RefreshCw, ChevronRight,
-  ShoppingBag, Bot, Zap, CheckCircle
+  ShoppingBag, Bot, Zap, CheckCircle, Brain, Trash2, Star, Heart, BookOpen
 } from "lucide-react";
 
 const ELEMENT_TYPES: { key: string; label: string; icon: any; color: string }[] = [
@@ -66,6 +66,34 @@ interface NinnaComment {
   mood: "default" | "happy" | "teasing" | "upsell";
   unlockedCount: number;
   lockedCount: number;
+}
+
+interface CloneMemory {
+  id: number;
+  userId: number;
+  memoryType: string;
+  key: string;
+  value: string;
+  importance: number;
+  emotionalContext: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ContentRecommendation {
+  id: number;
+  userId: number;
+  contentItemId: number;
+  score: number;
+  reasonCzech: string;
+  status: string;
+  contentItem?: {
+    id: number;
+    description: string | null;
+    priceAmount: number;
+    contentType: string;
+    thumbnailUrl: string | null;
+  };
 }
 
 // ─── Subscription Gate ────────────────────────────────────────────────────────
@@ -317,9 +345,10 @@ function AssetCard({
 export default function EBot() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"unlocked" | "locked">("unlocked");
+  const [activeTab, setActiveTab] = useState<"unlocked" | "locked" | "recommendations">("unlocked");
   const [activeType, setActiveType] = useState<string>("all");
   const [previewConfig, setPreviewConfig] = useState<Record<string, any> | null>(null);
+  const [memoryExpanded, setMemoryExpanded] = useState(false);
 
   const userStr = typeof window !== "undefined" ? localStorage.getItem("ninna_user") : null;
   const localUser = userStr ? JSON.parse(userStr) : null;
@@ -340,6 +369,29 @@ export default function EBot() {
     queryKey: ["/api/bot/ninna-comment"],
     enabled: !!botStatus?.botEnabled,
     refetchInterval: 30000,
+  });
+
+  const { data: memoryData, isLoading: memoryLoading } = useQuery<{ memories: CloneMemory[] }>({
+    queryKey: ["/api/bot/memory"],
+    enabled: !!botStatus?.botEnabled,
+    refetchInterval: 60000,
+  });
+
+  const { data: recsData, isLoading: recsLoading } = useQuery<{ recommendations: ContentRecommendation[] }>({
+    queryKey: ["/api/bot/recommendations"],
+    enabled: !!botStatus?.botEnabled && activeTab === "recommendations",
+    retry: false,
+  });
+
+  const deleteMemoryMutation = useMutation({
+    mutationFn: async (memoryId: number) => apiRequest("DELETE", `/api/bot/memory/${memoryId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bot/memory"] });
+      toast({ title: "Vzpomínka smazána", description: "Ninna si to nebude pamatovat" });
+    },
+    onError: () => {
+      toast({ title: "Chyba", description: "Nelze smazat vzpomínku", variant: "destructive" });
+    },
   });
 
   const currentConfig = previewConfig || wardrobeData?.currentConfig || {};
@@ -584,51 +636,214 @@ export default function EBot() {
                 )}
               </div>
             )}
+
+            {/* Memory Panel */}
+            {botStatus.botEnabled && (
+              <div className="bg-white/3 border border-white/8 rounded-xl p-4 space-y-3" data-testid="panel-memory">
+                <button
+                  onClick={() => setMemoryExpanded(!memoryExpanded)}
+                  className="w-full flex items-center justify-between"
+                  data-testid="button-toggle-memory"
+                >
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-3.5 h-3.5 text-violet-400" />
+                    <p className="text-xs font-bold text-white/70">Co Ninna ví o tobě</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {memoryData?.memories && memoryData.memories.length > 0 && (
+                      <span className="text-[10px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full">
+                        {memoryData.memories.length}
+                      </span>
+                    )}
+                    <ChevronRight className={`w-3 h-3 text-white/30 transition-transform ${memoryExpanded ? "rotate-90" : ""}`} />
+                  </div>
+                </button>
+                <AnimatePresence>
+                  {memoryExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      {memoryLoading ? (
+                        <div className="text-xs text-white/30 py-2 text-center">Načítám paměť...</div>
+                      ) : !memoryData?.memories || memoryData.memories.length === 0 ? (
+                        <div className="text-xs text-white/30 py-2 text-center">
+                          Ninna si tě zatím moc nepamatuje.<br />
+                          <span className="text-violet-400/60">Piš si s ní více 💜</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {memoryData.memories.slice(0, 5).map((mem) => (
+                            <div
+                              key={mem.id}
+                              className="flex items-start justify-between gap-2 bg-white/3 rounded-lg px-2.5 py-2"
+                              data-testid={`memory-item-${mem.id}`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] text-violet-300/70 font-medium uppercase tracking-wider mb-0.5">{mem.key}</p>
+                                <p className="text-xs text-white/70 leading-snug">{mem.value}</p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {Array.from({ length: Math.min(mem.importance, 3) }).map((_, i) => (
+                                  <Star key={i} className="w-2.5 h-2.5 text-amber-400/70 fill-amber-400/70" />
+                                ))}
+                                <button
+                                  onClick={() => deleteMemoryMutation.mutate(mem.id)}
+                                  className="ml-1 text-white/20 hover:text-red-400/70 transition-colors"
+                                  data-testid={`button-delete-memory-${mem.id}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {memoryData.memories.length > 5 && (
+                            <p className="text-[10px] text-white/25 text-center pt-1">
+                              +{memoryData.memories.length - 5} dalších vzpomínek
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
 
           {/* RIGHT — Šatník */}
           <div className="lg:col-span-3 space-y-4">
 
-            {/* Tab: Unlocked / Locked */}
+            {/* Tab: Unlocked / Locked / Recommendations */}
             <div className="flex bg-white/4 border border-white/8 rounded-xl p-1 gap-1">
               <button
                 onClick={() => setActiveTab("unlocked")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === "unlocked"
                     ? "bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow"
                     : "text-white/40 hover:text-white/60"
                 }`}
                 data-testid="tab-unlocked"
               >
-                <Unlock className="w-3.5 h-3.5" />
+                <Unlock className="w-3 h-3" />
                 Tvoje
                 {unlocked.length > 0 && (
-                  <span className={`text-xs px-1.5 rounded-full ${activeTab === "unlocked" ? "bg-white/20" : "bg-white/10 text-white/40"}`}>
+                  <span className={`text-[10px] px-1.5 rounded-full ${activeTab === "unlocked" ? "bg-white/20" : "bg-white/10 text-white/40"}`}>
                     {unlocked.length}
                   </span>
                 )}
               </button>
               <button
                 onClick={() => setActiveTab("locked")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === "locked"
                     ? "bg-gradient-to-r from-zinc-700 to-zinc-600 text-white shadow"
                     : "text-white/40 hover:text-white/60"
                 }`}
                 data-testid="tab-locked"
               >
-                <Lock className="w-3.5 h-3.5" />
+                <Lock className="w-3 h-3" />
                 Zamčené
                 {locked.length > 0 && (
-                  <span className={`text-xs px-1.5 rounded-full ${activeTab === "locked" ? "bg-white/20" : "bg-white/10 text-white/40"}`}>
+                  <span className={`text-[10px] px-1.5 rounded-full ${activeTab === "locked" ? "bg-white/20" : "bg-white/10 text-white/40"}`}>
                     {locked.length}
                   </span>
                 )}
               </button>
+              <button
+                onClick={() => setActiveTab("recommendations")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === "recommendations"
+                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow"
+                    : "text-white/40 hover:text-white/60"
+                }`}
+                data-testid="tab-recommendations"
+              >
+                <Sparkles className="w-3 h-3" />
+                Pro tebe
+              </button>
             </div>
 
-            {/* Type filter */}
-            <div className="flex gap-1.5 flex-wrap">
+            {/* Recommendations Panel */}
+            {activeTab === "recommendations" && (
+              <div className="space-y-3" data-testid="panel-recommendations">
+                {recsLoading ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="aspect-[3/4] rounded-xl bg-white/3 animate-pulse" />
+                    ))}
+                  </div>
+                ) : !recsData?.recommendations || recsData.recommendations.length === 0 ? (
+                  <div className="bg-white/2 border border-white/6 rounded-2xl p-10 text-center">
+                    <div className="w-14 h-14 rounded-full bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
+                      <Sparkles className="w-6 h-6 text-violet-400/50" />
+                    </div>
+                    <p className="text-white/50 font-semibold mb-2">Ninna chystá doporučení</p>
+                    <p className="text-white/25 text-sm">
+                      Piš si s Ninnou a ona ti doporučí obsah přesně pro tebe 💜
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {recsData.recommendations.map((rec) => (
+                      <motion.div
+                        key={rec.id}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white/3 border border-violet-500/20 rounded-xl overflow-hidden"
+                        data-testid={`recommendation-${rec.id}`}
+                      >
+                        <div className="aspect-[3/4] bg-gradient-to-br from-violet-900/30 to-indigo-900/30 relative flex items-center justify-center">
+                          {rec.contentItem?.thumbnailUrl ? (
+                            <img
+                              src={rec.contentItem.thumbnailUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-4xl">
+                              {rec.contentItem?.contentType === "video" ? "🎬" : "📸"}
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2">
+                            <span className="text-[10px] bg-violet-600/80 text-white px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+                              {Math.round(rec.score * 100)}% shoda
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-2.5">
+                          <p className="text-xs text-white/70 leading-snug line-clamp-2">{rec.reasonCzech}</p>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <span className="text-[11px] font-bold text-violet-300">
+                              {rec.contentItem?.priceAmount ? `${rec.contentItem.priceAmount} Kč` : ""}
+                            </span>
+                            <button
+                              onClick={() => setLocation("/chat")}
+                              className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
+                              data-testid={`button-get-rec-${rec.id}`}
+                            >
+                              Získat →
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+                <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3 flex gap-2 items-start">
+                  <Heart className="w-3.5 h-3.5 text-violet-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-white/40 leading-relaxed">
+                    Ninna tato doporučení připravila speciálně pro tebe na základě toho, co se ti líbí.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Type filter + Grid — only for wardrobe tabs */}
+            {activeTab !== "recommendations" && (
+            <><div className="flex gap-1.5 flex-wrap">
               <button
                 onClick={() => setActiveType("all")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -738,6 +953,7 @@ export default function EBot() {
                 </p>
               </motion.div>
             )}
+            </>)}
           </div>
         </div>
       </div>

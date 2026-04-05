@@ -1,4 +1,4 @@
-import { users, conversations, messages, contentItems, managerActions, managerLog, payments, avatarElements, avatarInstances, userUnlockedAssets, type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, type ContentItem, type InsertContentItem, type ManagerAction, type ManagerLog, type Payment, type InsertPayment, type AvatarElement, type InsertAvatarElement, type AvatarInstance, type InsertAvatarInstance, type UserUnlockedAsset } from "@shared/schema";
+import { users, conversations, messages, contentItems, managerActions, managerLog, payments, avatarElements, avatarInstances, userUnlockedAssets, cloneMemories, contentRecommendations, subscriptionEvents, type User, type InsertUser, type Conversation, type InsertConversation, type Message, type InsertMessage, type ContentItem, type InsertContentItem, type ManagerAction, type ManagerLog, type Payment, type InsertPayment, type AvatarElement, type InsertAvatarElement, type AvatarInstance, type InsertAvatarInstance, type UserUnlockedAsset, type CloneMemory, type ContentRecommendation } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, sql, and, inArray } from "drizzle-orm";
 
@@ -63,6 +63,24 @@ export interface IStorage {
   getUserBotContext(userId: number): Promise<{ hasBot: boolean; capabilityLevel: number; unlockedCount: number; totalCount: number; outfitNames: string[] }>;
   updateCapabilityLevel(userId: number, level: number): Promise<void>;
   autoCreateAvatarElements(contentItemId: number): Promise<AvatarElement[]>;
+
+  // ─── Clone Memory System ───────────────────────────────────────────────────
+  getCloneMemories(userId: number, options?: { limit?: number; minImportance?: number; types?: string[] }): Promise<CloneMemory[]>;
+  upsertCloneMemory(userId: number, data: { memoryType: string; content: string; importance: number; tags: string[]; source: string; emotionalContext?: string }): Promise<CloneMemory>;
+  deleteCloneMemory(id: number): Promise<void>;
+
+  // ─── Content Recommendations ──────────────────────────────────────────────
+  createContentRecommendation(data: { userId: number; contentItemId: number; score: number; reason?: string; category: string; status: string }): Promise<ContentRecommendation>;
+  getContentRecommendations(userId: number, options?: { statusFilter?: string[]; limit?: number }): Promise<ContentRecommendation[]>;
+  updateRecommendationStatus(id: number, status: string, shownAt?: Date): Promise<void>;
+
+  // ─── Payment Helpers ──────────────────────────────────────────────────────
+  getUserPurchasedContentIds(userId: number): Promise<number[]>;
+  getUserPaymentStats(userId: number): Promise<{ totalSpent: number; purchaseCount: number }>;
+  getRecentMessages(conversationId: number, limit: number): Promise<Message[]>;
+
+  // ─── Subscription Events ──────────────────────────────────────────────────
+  createSubscriptionEvent(data: { userId?: number; stripeSubscriptionId?: string; eventType: string; planKey?: string; capabilityLevel?: number; amountCzk?: number; expiresAt?: Date; metadata?: Record<string, any> }): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -510,6 +528,117 @@ export class DatabaseStorage implements IStorage {
 
     console.log(`[Twin] Auto-created avatar element "${baseName}" (${elementType}) from content #${contentItemId}`);
     return elements;
+  }
+
+  // ─── Clone Memory System ────────────────────────────────────────────────────
+  async getCloneMemories(userId: number, options: { limit?: number; minImportance?: number; types?: string[] } = {}): Promise<CloneMemory[]> {
+    const { limit = 20, minImportance = 1, types } = options;
+    let query = db.select().from(cloneMemories)
+      .where(
+        types && types.length > 0
+          ? and(eq(cloneMemories.userId, userId), gte(cloneMemories.importance, minImportance), inArray(cloneMemories.memoryType, types))
+          : and(eq(cloneMemories.userId, userId), gte(cloneMemories.importance, minImportance))
+      )
+      .orderBy(desc(cloneMemories.importance), desc(cloneMemories.updatedAt))
+      .limit(limit);
+    return await query;
+  }
+
+  async upsertCloneMemory(userId: number, data: { memoryType: string; content: string; importance: number; tags: string[]; source: string; emotionalContext?: string }): Promise<CloneMemory> {
+    const existing = await db.select().from(cloneMemories)
+      .where(and(eq(cloneMemories.userId, userId), eq(cloneMemories.memoryType, data.memoryType), eq(cloneMemories.content, data.content)))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db.update(cloneMemories)
+        .set({ importance: Math.max(existing[0].importance, data.importance), updatedAt: new Date() })
+        .where(eq(cloneMemories.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db.insert(cloneMemories).values({
+      userId,
+      memoryType: data.memoryType,
+      content: data.content,
+      importance: data.importance,
+      tags: data.tags,
+      source: data.source,
+      emotionalContext: data.emotionalContext,
+    }).returning();
+    return created;
+  }
+
+  async deleteCloneMemory(id: number): Promise<void> {
+    await db.delete(cloneMemories).where(eq(cloneMemories.id, id));
+  }
+
+  // ─── Content Recommendations ──────────────────────────────────────────────
+  async createContentRecommendation(data: { userId: number; contentItemId: number; score: number; reason?: string; category: string; status: string }): Promise<ContentRecommendation> {
+    const [rec] = await db.insert(contentRecommendations).values({
+      userId: data.userId,
+      contentItemId: data.contentItemId,
+      score: data.score,
+      reason: data.reason,
+      category: data.category,
+      status: data.status,
+    }).returning();
+    return rec;
+  }
+
+  async getContentRecommendations(userId: number, options: { statusFilter?: string[]; limit?: number } = {}): Promise<ContentRecommendation[]> {
+    const { statusFilter, limit = 10 } = options;
+    let query = db.select().from(contentRecommendations)
+      .where(
+        statusFilter && statusFilter.length > 0
+          ? and(eq(contentRecommendations.userId, userId), inArray(contentRecommendations.status, statusFilter))
+          : eq(contentRecommendations.userId, userId)
+      )
+      .orderBy(desc(contentRecommendations.score))
+      .limit(limit);
+    return await query;
+  }
+
+  async updateRecommendationStatus(id: number, status: string, shownAt?: Date): Promise<void> {
+    await db.update(contentRecommendations)
+      .set({ status, ...(shownAt ? { shownAt } : {}) })
+      .where(eq(contentRecommendations.id, id));
+  }
+
+  // ─── Payment Helpers ──────────────────────────────────────────────────────
+  async getUserPurchasedContentIds(userId: number): Promise<number[]> {
+    const userPayments = await this.getPaymentsByUser(userId);
+    return userPayments
+      .filter(p => p.status === "completed" && p.contentItemId !== null)
+      .map(p => p.contentItemId as number);
+  }
+
+  async getUserPaymentStats(userId: number): Promise<{ totalSpent: number; purchaseCount: number }> {
+    const userPayments = await this.getPaymentsByUser(userId);
+    const completed = userPayments.filter(p => p.status === "completed");
+    const totalSpent = Math.round(completed.reduce((s, p) => s + p.amount, 0) / 100);
+    return { totalSpent, purchaseCount: completed.length };
+  }
+
+  async getRecentMessages(conversationId: number, limit: number): Promise<Message[]> {
+    return await db.select().from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit);
+  }
+
+  // ─── Subscription Events ──────────────────────────────────────────────────
+  async createSubscriptionEvent(data: { userId?: number; stripeSubscriptionId?: string; eventType: string; planKey?: string; capabilityLevel?: number; amountCzk?: number; expiresAt?: Date; metadata?: Record<string, any> }): Promise<void> {
+    await db.insert(subscriptionEvents).values({
+      userId: data.userId ?? null,
+      stripeSubscriptionId: data.stripeSubscriptionId,
+      eventType: data.eventType,
+      planKey: data.planKey,
+      capabilityLevel: data.capabilityLevel,
+      amountCzk: data.amountCzk,
+      expiresAt: data.expiresAt,
+      metadata: data.metadata || {},
+    });
   }
 }
 

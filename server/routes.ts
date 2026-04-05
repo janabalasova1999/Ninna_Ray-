@@ -311,12 +311,12 @@ VIDEA: ${videos.map(i => `#${i.id}${i.description ? ` (${i.description.substring
       const botContext = botCtx ? `
 E-BOT ŠATNÍK (co user odemkl v šatníku Ninny):
 - Má předplatné / E-Bot: ${botCtx.hasBot ? "ANO" : "NE"}
+- Tier level: ${botCtx.capabilityLevel}/3
 - Odemčeno assetů: ${botCtx.unlockedCount}/${botCtx.totalCount}
 - Aktivní outfity: ${botCtx.outfitNames.length > 0 ? botCtx.outfitNames.join(", ") : "výchozí (spodní prádlo)"}
 ${botCtx.hasBot && botCtx.unlockedCount === 0 ? "- TIP: Nabídni mu koupit fotku, která odemkne outfit pro bota — ukáže zájem." : ""}
 ${botCtx.hasBot && botCtx.unlockedCount > 0 ? `- Můžeš zmínit konkrétní outfit: "${botCtx.outfitNames[0]}" — vytvoří osobní spojení.` : ""}
 ${!botCtx.hasBot ? "- Nemá předplatné → zmíni E-Bot jako bonus k předplatnému." : ""}` : "";
-
 
       const suggestedPhotoPrice = aiProfile?.suggestedPrice || 99;
       const videoPrice = Math.round(suggestedPhotoPrice * 1.8);
@@ -336,6 +336,21 @@ ${!botCtx.hasBot ? "- Nemá předplatné → zmíni E-Bot jako bonus k předplat
       const hasHighEngagement = avgLen > 35 || (aiProfile?.engagementScore || 0) >= 60;
       const hasDirectInterest = history.some(m => m.role === "user" && (m.content.toLowerCase().includes("buy") || m.content.toLowerCase().includes("koupit") || m.content.toLowerCase().includes("show") || m.content.toLowerCase().includes("foto")));
 
+      // Clone Memory — Ninna si pamatuje kdo je
+      const { buildMemoryContext, computeEmotionalState, buildEmotionalStatePrompt } = await import("./clone-memory");
+      const memoryContext = user?.id ? await buildMemoryContext(user.id) : "";
+      
+      // Emotional state machine
+      const hasPurchased = !!purchaseContext;
+      const emotionalCtx = computeEmotionalState(
+        msgCount,
+        botCtx?.unlockedCount || 0,
+        avgLen,
+        hasPurchased,
+        hasDirectInterest
+      );
+      const emotionalStatePrompt = buildEmotionalStatePrompt(emotionalCtx.currentState, emotionalCtx.intensity);
+
       const systemPrompt = `Jsi Ninna_Ray🍒. Mladá, sebevědomá holka co tvoří obsah. Píšeš si s fanouškem.
 NEJSI AI. NEJSI asistent. Jsi reálná osoba co zrovna kouká na mobil.
 
@@ -343,6 +358,9 @@ Píšeš s: '${userName}' (vokativ!)
 ${profileContext}${purchaseContext}${pricingContext}
 ${vaultContext}
 ${botContext}
+${memoryContext}
+
+${emotionalStatePrompt}
 
 ══════════════════════════════════════════════════════════════════
 RELATIONSHIP-FIRST PSYCHOLOGICKÁ STRATEGIE (NEJDŮLEŽITĚJŠÍ)
@@ -670,6 +688,19 @@ NIKDY NEDĚLEJ:
 
       const userObj = await storage.getUser(conversation.userId);
       import("./manager-engine").then(m => m.onNewMessage(conversation.userId, userObj?.name || "unknown")).catch(() => {});
+
+      // Async memory consolidation (non-blocking, won't affect response time)
+      if (conversation.userId) {
+        import("./clone-memory").then(({ consolidateMemoryAsync }) => {
+          consolidateMemoryAsync(
+            conversation.userId,
+            conversationId,
+            content,
+            fullResponse,
+            msgCount
+          ).catch(() => {});
+        }).catch(() => {});
+      }
 
       res.end();
     } catch (error) {
@@ -2349,6 +2380,108 @@ Jméno (name) musí být v češtině, výstižné a poetické (např. "Červen�
       res.json({ summary, config });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── Clone Memory Routes ──────────────────────────────────────────────────
+
+  // GET /api/bot/memory — paměť Ninny o uživateli
+  app.get("/api/bot/memory", async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
+
+      const memories = await storage.getCloneMemories(userId);
+      res.json({ memories });
+    } catch (err: any) {
+      console.error("[Memory] get error:", err.message);
+      res.status(500).json({ message: "Chyba při načítání paměti" });
+    }
+  });
+
+  // DELETE /api/bot/memory/:id — smazat konkrétní paměť
+  app.delete("/api/bot/memory/:id", async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
+
+      const memoryId = parseInt(req.params.id);
+      if (isNaN(memoryId)) return res.status(400).json({ message: "Neplatné ID" });
+
+      await storage.deleteCloneMemory(memoryId);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/bot/recommendations — doporučený obsah pro uživatele
+  app.get("/api/bot/recommendations", async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
+
+      const recs = await storage.getContentRecommendations(userId, 6);
+      
+      // If no recommendations yet, generate them
+      if (recs.length === 0) {
+        const { generateRecommendationsForUser } = await import("./recommendation-engine");
+        generateRecommendationsForUser(userId).catch(() => {});
+      }
+
+      res.json({ recommendations: recs });
+    } catch (err: any) {
+      console.error("[Recs] get error:", err.message);
+      res.status(500).json({ message: "Chyba při načítání doporučení" });
+    }
+  });
+
+  // ─── Manager Subscription Health Routes ─────────────────────────────────
+
+  // GET /api/manager/subscription-health — přehled churn rizika
+  app.get("/api/manager/subscription-health", requireOwner, async (req, res) => {
+    try {
+      const { getSubscriptionHealthReport } = await import("./subscription-tracker");
+      const raw = await getSubscriptionHealthReport();
+
+      // Transform to frontend-expected shape
+      const churnCandidates = raw.users
+        .filter(u => u.churnRiskLabel !== "low")
+        .sort((a, b) => b.churnRiskScore - a.churnRiskScore)
+        .map(u => {
+          const daysSince = u.lastActiveAt
+            ? Math.floor((Date.now() - new Date(u.lastActiveAt).getTime()) / (1000 * 60 * 60 * 24))
+            : 999;
+          let action = "Pošli motivační zprávu";
+          if (u.churnRiskLabel === "critical") action = "Okamžitě kontaktuj — hrozí odchod!";
+          else if (u.churnRiskLabel === "high") action = "Připomeň nejnovější obsah";
+          else if (u.churnRiskLabel === "medium") action = "Nabídni slevu nebo exkluzivní obsah";
+          return {
+            userId: u.userId,
+            userName: u.userName,
+            churnRisk: u.churnRiskLabel,
+            riskScore: u.churnRiskScore / 100,
+            riskFactors: u.signals,
+            daysSinceLastMessage: daysSince,
+            subscriptionAge: 0,
+            messageCount: 0,
+            purchaseCount: u.purchaseCount,
+            suggestedAction: action,
+          };
+        });
+
+      res.json({
+        totalSubscribers: raw.summary.totalSubscribed,
+        activeSubscribers: raw.summary.totalSubscribed - raw.summary.atRisk,
+        atRiskSubscribers: raw.summary.atRisk,
+        estimatedMRR: raw.summary.totalMrr,
+        estimatedARR: raw.summary.totalMrr * 12,
+        churnCandidates,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error("[SubTracker] health error:", err.message);
+      res.status(500).json({ message: "Chyba při načítání přehledu předplatného" });
     }
   });
 
