@@ -8,6 +8,7 @@ import Chat from "@/pages/Chat";
 import AgentDashboard from "@/pages/AgentDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
 import ManagerDashboard from "@/pages/ManagerDashboard";
+import OwnerControl from "@/pages/OwnerControl";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/agent" component={AgentDashboard} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/manager" component={ManagerDashboard} />
+      <Route path="/owner" component={OwnerControl} />
       <Route component={NotFound} />
     </Switch>
   );
