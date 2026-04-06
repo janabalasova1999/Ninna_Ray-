@@ -80,8 +80,10 @@ export class WebhookHandlers {
                     confirmMsg = `✅ Platba ${amountCzk} Kč přijata! Tady máš svůj exkluzivní ${isVideo ? "video" : "obsah"} 💋🔓\n\n[UNLOCKED_CONTENT:${payment.contentItemId}]\n\n✨ Tohle se ti odemklo i v šatníku — mrkni na svojí Ninnu 😏`;
                   }
                 }
-                await storage.createMessage(convs[0].id, "assistant", confirmMsg);
-                console.log(`[Webhook] Confirmation message sent to conversation #${convs[0].id}`);
+                // Send to LATEST conversation, not the first one
+                const latestConv = convs[convs.length - 1];
+                await storage.createMessage(latestConv.id, "assistant", confirmMsg);
+                console.log(`[Webhook] Confirmation message sent to conversation #${latestConv.id} (latest)`);
               } else {
                 console.warn(`[Webhook] No conversations found for user #${payment.userId} - cannot send confirmation!`);
               }
