@@ -9,6 +9,7 @@ import { useVoice } from "@/hooks/use-voice";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import { NPCCharacter } from "@/components/NPCCharacter";
 
 import ninnaPhoto from "@assets/IMG_4700_1768775323977.jpeg";
 
@@ -176,7 +177,13 @@ export default function Chat() {
         </div>
 
         {botStatus?.isSubscribed && (
-          <AvatarDisplay userId={user?.id} compact={true} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex justify-center py-2"
+          >
+            <NPCCharacter isSpeaking={isTyping} isTyping={isTyping} expression="teasing" />
+          </motion.div>
         )}
         
         <AnimatePresence initial={false}>
