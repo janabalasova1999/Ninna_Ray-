@@ -49,18 +49,36 @@ export class WebhookHandlers {
               
               if (payment.contentItemId) {
                 try {
-                  await storage.autoCreateAvatarElements(payment.contentItemId);
-                  const unlockedCount = await storage.unlockAssetsForPayment(
-                    payment.userId,
-                    payment.contentItemId,
-                    payment.id
+                  // Check if user already has this content (DUPLICATE PREVENTION)
+                  const allElements = await storage.getAvatarElementsForContent(payment.contentItemId);
+                  const userHasContent = await Promise.all(
+                    allElements.map(async (elem) => {
+                      const unlocked = await storage.checkAssetUnlocked(payment.userId, elem.id);
+                      return unlocked;
+                    })
                   );
-                  console.log(`[Webhook] Unlocked ${unlockedCount} assets for user #${payment.userId}`);
-                  if (unlockedCount > 0) {
+                  const alreadyOwns = userHasContent.some(u => u);
+
+                  if (alreadyOwns) {
+                    console.warn(`[Webhook] User #${payment.userId} already owns content #${payment.contentItemId} — duplicate prevention!`);
                     await storage.addManagerLog(
-                      'assets_unlocked',
-                      `${unlockedCount} avatar assetů odemčeno pro uživatele #${payment.userId} (obsah #${payment.contentItemId})`
+                      'duplicate_purchase_prevented',
+                      `User #${payment.userId} již vlastní obsah #${payment.contentItemId}. Refund by měl být zahlášen.`
                     );
+                  } else {
+                    await storage.autoCreateAvatarElements(payment.contentItemId);
+                    const unlockedCount = await storage.unlockAssetsForPayment(
+                      payment.userId,
+                      payment.contentItemId,
+                      payment.id
+                    );
+                    console.log(`[Webhook] Unlocked ${unlockedCount} assets for user #${payment.userId}`);
+                    if (unlockedCount > 0) {
+                      await storage.addManagerLog(
+                        'assets_unlocked',
+                        `${unlockedCount} avatar assetů odemčeno pro uživatele #${payment.userId} (obsah #${payment.contentItemId})`
+                      );
+                    }
                   }
                 } catch (unlockErr: any) {
                   console.error('[Webhook] Asset unlock error:', unlockErr.message);

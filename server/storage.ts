@@ -433,6 +433,17 @@ export class DatabaseStorage implements IStorage {
     return map;
   }
 
+  // Get all avatar elements for a specific content item
+  async getAvatarElementsForContent(contentItemId: number): Promise<AvatarElement[]> {
+    return db.select().from(avatarElements).where(eq(avatarElements.contentItemId, contentItemId));
+  }
+
+  // Check if a user has a specific asset unlocked
+  async checkAssetUnlocked(userId: number, elementId: number): Promise<boolean> {
+    const unlocked = await this.getUserUnlockedAssetIds(userId);
+    return unlocked.includes(elementId);
+  }
+
   async unlockAssetsForPayment(userId: number, contentItemId: number, paymentId: number): Promise<number> {
     // Najdi všechny avatar elementy pro tento content item
     const elements = await db.select().from(avatarElements)
