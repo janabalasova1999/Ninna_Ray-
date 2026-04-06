@@ -22,27 +22,41 @@ export function useChat({ userId }: UseChatProps) {
   // Store the active conversation ID
   const conversationIdRef = useRef<number | null>(null);
 
-  // Periodically reload conversation messages (every 5 seconds)
-  // This ensures we see when webhook adds [UNLOCKED_CONTENT] markers
+  // Aggressively reload conversation messages
+  // Every 2 seconds to catch webhook updates immediately
   useEffect(() => {
     if (!activeConversationId) return;
 
-    const interval = setInterval(async () => {
+    const reloadMessages = async () => {
       try {
-        const histRes = await fetch(`/api/conversations/${activeConversationId}`);
+        const histRes = await fetch(`/api/conversations/${activeConversationId}?t=${Date.now()}`);
         if (histRes.ok) {
           const data = await histRes.json();
-          setMessages(data.messages.map((m: any) => ({
+          const newMessages = data.messages.map((m: any) => ({
             id: m.id.toString(),
             role: m.role,
             content: m.content,
             isSeen: m.isSeen,
-          })));
+          }));
+          
+          // Only update if messages changed (avoid unnecessary re-renders)
+          setMessages(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(newMessages)) {
+              return newMessages;
+            }
+            return prev;
+          });
         }
       } catch (err) {
-        console.error("Failed to reload messages:", err);
+        // Silently fail, don't spam console
       }
-    }, 5000);
+    };
+
+    // Reload immediately on mount
+    reloadMessages();
+
+    // Then reload every 2 seconds
+    const interval = setInterval(reloadMessages, 2000);
 
     return () => clearInterval(interval);
   }, [activeConversationId]);
