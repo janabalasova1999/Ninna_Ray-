@@ -175,7 +175,9 @@ export default function Chat() {
           </span>
         </div>
 
-        <AvatarDisplay userId={user?.id} compact={false} />
+        {botStatus?.isSubscribed && (
+          <AvatarDisplay userId={user?.id} compact={true} />
+        )}
         
         <AnimatePresence initial={false}>
           {messages.map((msg) => (

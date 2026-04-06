@@ -57,6 +57,19 @@ function requireOwner(req: Request, res: Response, next: NextFunction) {
   res.status(403).json({ message: "Forbidden" });
 }
 
+async function requireSubscription(req: Request, res: Response, next: NextFunction) {
+  const userId = req.session?.userId;
+  if (!userId) return res.status(401).json({ message: "Not authenticated" });
+  
+  const user = await storage.getUser(userId);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  
+  const isSubscribed = user.platform === "vip_subscriber" || user.isPremium === true;
+  if (!isSubscribed) return res.status(403).json({ message: "E-Bot requires active subscription" });
+  
+  next();
+}
+
 // ─── Agency sync ─────────────────────────────────────────────────────────────
 async function sendToAgency(userId: number, message: string, role: string) {
   const agencyUrl = "https://digital-agency--yp8vpb4ggy.replit.app/sync";
@@ -2233,7 +2246,7 @@ Vrať POUZE JSON, nic jiného!`,
   // ═══════════════════════════════════════════════════════════════════════════
 
   // GET /api/avatar/instance — vrátit aktuální konfiguraci Virtual Twina pro přihlášeného uživatele
-  app.get("/api/avatar/instance", async (req, res) => {
+  app.get("/api/avatar/instance", requireSubscription, async (req, res) => {
     try {
       const userId = req.session.userId;
       if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
@@ -2254,7 +2267,7 @@ Vrať POUZE JSON, nic jiného!`,
   });
 
   // GET /api/avatar/elements — dostupné skiny z zakoupených fotek zákazníka
-  app.get("/api/avatar/elements", async (req, res) => {
+  app.get("/api/avatar/elements", requireSubscription, async (req, res) => {
     try {
       const userId = req.session.userId;
       if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
@@ -2285,7 +2298,7 @@ Vrať POUZE JSON, nic jiného!`,
   });
 
   // POST /api/avatar/apply-skin — aplikovat skin na Virtual Twina
-  app.post("/api/avatar/apply-skin", async (req, res) => {
+  app.post("/api/avatar/apply-skin", requireSubscription, async (req, res) => {
     try {
       const userId = req.session.userId;
       if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
@@ -2332,7 +2345,7 @@ Vrať POUZE JSON, nic jiného!`,
   });
 
   // POST /api/avatar/reset — reset avataru na výchozí
-  app.post("/api/avatar/reset", async (req, res) => {
+  app.post("/api/avatar/reset", requireSubscription, async (req, res) => {
     try {
       const userId = req.session.userId;
       if (!userId) return res.status(401).json({ message: "Nejsi přihlášen" });
