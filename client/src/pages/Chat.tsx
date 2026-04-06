@@ -120,6 +120,9 @@ export default function Chat() {
           <div>
             <h2 className="font-bold text-white leading-none">Ninna_Ray🍒</h2>
             <span className="text-[10px] text-pink-500 font-bold uppercase tracking-wider">Online</span>
+            {user?.chatCode && (
+              <p className="text-[9px] text-neutral-600 font-mono mt-0.5">{user.chatCode}</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1">

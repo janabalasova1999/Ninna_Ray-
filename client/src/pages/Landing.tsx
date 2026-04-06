@@ -14,7 +14,9 @@ export default function Landing() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [name, setName] = useState("");
+  const [chatCode, setChatCode] = useState("");
   const [lang, setLang] = useState<"cs" | "en">("cs");
+  const [mode, setMode] = useState<"login" | "new">("login");
 
   // Redirect if already logged in
   useEffect(() => {
@@ -38,6 +40,24 @@ export default function Landing() {
         variant: "destructive",
         title: lang === "cs" ? "Chyba" : "Error",
         description: lang === "cs" ? "Nepodařilo se připojit." : "Failed to connect.",
+      });
+    },
+  });
+
+  const loginUser = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/users/login", { chatCode: code });
+      return res.json();
+    },
+    onSuccess: (user) => {
+      localStorage.setItem("ninna_user", JSON.stringify(user));
+      setLocation("/chat");
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: lang === "cs" ? "Chyba" : "Error",
+        description: lang === "cs" ? "Neplatný kód. Zkuste znovu." : "Invalid code. Try again.",
       });
     },
   });
@@ -86,25 +106,67 @@ export default function Landing() {
                 ENGLISH
               </button>
             </div>
-            
-            <div className="space-y-3">
-              <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">
-                {lang === "cs" ? "Tvé jméno" : "Your name"}
-              </label>
-              <Input
-                placeholder={lang === "cs" ? "Jak ti mám říkat?" : "How should I call you?"}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-14 bg-white/5 border-white/10 text-white rounded-2xl focus:border-pink-500/50 focus:ring-pink-500/20 transition-all text-lg px-6 placeholder:text-neutral-600"
-              />
+
+            {/* Mode toggle */}
+            <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+              <button 
+                onClick={() => setMode("login")}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${mode === "login" ? "bg-pink-600 text-white shadow-lg shadow-pink-600/20" : "text-neutral-400 hover:text-white"}`}
+              >
+                {lang === "cs" ? "Přihlášení" : "Login"}
+              </button>
+              <button 
+                onClick={() => setMode("new")}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${mode === "new" ? "bg-pink-600 text-white shadow-lg shadow-pink-600/20" : "text-neutral-400 hover:text-white"}`}
+              >
+                {lang === "cs" ? "Nový" : "New"}
+              </button>
             </div>
+            
+            {mode === "login" ? (
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">
+                  {lang === "cs" ? "Tvůj kód (chat code)" : "Your code"}
+                </label>
+                <Input
+                  placeholder={lang === "cs" ? "např. NINNA-AB12" : "e.g. NINNA-AB12"}
+                  value={chatCode}
+                  onChange={(e) => setChatCode(e.target.value.toUpperCase())}
+                  className="h-14 bg-white/5 border-white/10 text-white rounded-2xl focus:border-pink-500/50 focus:ring-pink-500/20 transition-all text-lg px-6 placeholder:text-neutral-600 font-mono"
+                />
+                <p className="text-[10px] text-neutral-600 ml-1">
+                  {lang === "cs" ? "Dostal(a) jsi ho po první návštěvě" : "You received it after first visit"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">
+                  {lang === "cs" ? "Tvé jméno" : "Your name"}
+                </label>
+                <Input
+                  placeholder={lang === "cs" ? "Jak ti mám říkat?" : "How should I call you?"}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="h-14 bg-white/5 border-white/10 text-white rounded-2xl focus:border-pink-500/50 focus:ring-pink-500/20 transition-all text-lg px-6 placeholder:text-neutral-600"
+                />
+              </div>
+            )}
 
             <Button
               className="w-full bg-pink-600 hover:bg-pink-500 text-white font-bold h-14 rounded-2xl text-lg shadow-xl shadow-pink-900/20 transition-all active:scale-[0.98] border-none"
-              onClick={() => name.trim() && createUser.mutate(name)}
-              disabled={!name.trim() || createUser.isPending}
+              onClick={() => {
+                if (mode === "login") {
+                  chatCode.trim() && loginUser.mutate(chatCode);
+                } else {
+                  name.trim() && createUser.mutate(name);
+                }
+              }}
+              disabled={mode === "login" ? !chatCode.trim() || loginUser.isPending : !name.trim() || createUser.isPending}
             >
-              {lang === "cs" ? "Vstoupit do chatu" : "Enter Private Chat"}
+              {mode === "login" 
+                ? (lang === "cs" ? "Přihlásit se" : "Login")
+                : (lang === "cs" ? "Vstoupit do chatu" : "Enter Private Chat")
+              }
             </Button>
 
             <p className="text-center text-[10px] text-neutral-600 uppercase tracking-widest font-medium">
