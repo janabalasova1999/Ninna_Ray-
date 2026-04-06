@@ -721,11 +721,23 @@ function VaultTab() {
         {items.map(item => (
           <div key={item.id} data-testid={`card-vault-item-${item.id}`}
             className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${
+            {item.mimeType.startsWith("image") || item.mimeType.startsWith("video") ? (
+              <img 
+                src={`/uploads/${item.filename}`} 
+                alt={item.originalName}
+                className="w-16 h-16 rounded-lg object-cover shrink-0 border border-neutral-700"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                  const fallback = (e.target as HTMLImageElement).nextElementSibling;
+                  if (fallback) fallback.style.display = "flex";
+                }}
+              />
+            ) : null}
+            <div className={`w-16 h-16 rounded-lg flex items-center justify-center text-lg shrink-0 ${
               item.mimeType.startsWith("image") ? "bg-pink-500/20" :
               item.mimeType.startsWith("video") ? "bg-purple-500/20" :
               item.mimeType.startsWith("audio") ? "bg-blue-500/20" : "bg-neutral-800"
-            }`}>
+            }`} style={item.mimeType.startsWith("image") || item.mimeType.startsWith("video") ? {display: "none"} : {}}>
               {item.mimeType.startsWith("image") ? "📸" : item.mimeType.startsWith("video") ? "🎬" : item.mimeType.startsWith("audio") ? "🎵" : "📄"}
             </div>
             <div className="flex-1 min-w-0">
