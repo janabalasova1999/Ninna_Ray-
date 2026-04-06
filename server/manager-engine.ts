@@ -187,14 +187,18 @@ Zatím žádné nákupy.
       const highPriorityRecs = intel.recommendations.filter(r => r.priority === "high");
       if (highPriorityRecs.length > 0 || intel.trendScore !== 0) {
         marketDirectives = `
-═══ TRŽNÍ INTELLIGENCE — PŘÍKAZY K ČINU ═══
-Trend skóre: ${intel.trendScore > 0 ? "↑ ROSTOUCÍ" : intel.trendScore < 0 ? "↓ KLESAJÍCÍ — reaguj!" : "→ STABILNÍ"}
-Konverze: ${intel.internalMetrics.conversionRate}% | Celkové tržby: ${intel.internalMetrics.totalRevenue} Kč | Transakcí: ${intel.internalMetrics.totalTransactions}
-${intel.internalMetrics.bestSellingPriceRange ? `Nejúspěšnější cenový rozsah: ${intel.internalMetrics.bestSellingPriceRange.min}-${intel.internalMetrics.bestSellingPriceRange.max} Kč` : ""}
-Segmenty: ${intel.internalMetrics.userSegments.highSpenders} VIP, ${intel.internalMetrics.userSegments.midSpenders} střed, ${intel.internalMetrics.userSegments.lowSpenders} low, ${intel.internalMetrics.userSegments.nonBuyers} nekupujících
+═══ TRŽNÍ INTELLIGENCE — ANALÝZA PRO TVOJE ROZHODOVÁNÍ ═══
+(Toto je KONTEXTUÁLNÍ INFORMACE, ne příkazy. Sám se rozhoduj co je nejlepší!)
 
-STRATEGICKÉ PŘÍKAZY (řiď se jimi):
-${intel.recommendations.map(r => `  ${r.priority === "high" ? "⚠️" : "→"} [${r.type}] ${r.title}: ${r.description}`).join("\n")}
+Trend skóre: ${intel.trendScore > 0 ? "↑ ROSTOUCÍ trh" : intel.trendScore < 0 ? "↓ KLESAJÍCÍ trh — zvažuj adaptaci" : "→ STABILNÍ trh"}
+Konverze: ${intel.internalMetrics.conversionRate}% | Celkové tržby: ${intel.internalMetrics.totalRevenue} Kč | Transakcí: ${intel.internalMetrics.totalTransactions}
+${intel.internalMetrics.bestSellingPriceRange ? `Historicky nejúspěšnější cena: ${intel.internalMetrics.bestSellingPriceRange.min}-${intel.internalMetrics.bestSellingPriceRange.max} Kč (referenční bod)` : ""}
+Segmentace: ${intel.internalMetrics.userSegments.highSpenders} VIP kupujících | ${intel.internalMetrics.userSegments.midSpenders} středově aktívních | ${intel.internalMetrics.userSegments.lowSpenders} nízkých | ${intel.internalMetrics.userSegments.nonBuyers} nekupujících
+
+DOPORUČENÉ STRATEGIE (izberbej co se hodí tomuto uživateli):
+${intel.recommendations.map(r => `  [${r.priority}] ${r.title}: ${r.description} — sám se rozhoduj jestli to aplikovat`).join("\n")}
+
+AUTONOMNÍ MYŠLENÍ: Kombinuj tato data se znalostí uživatele a rozhoduj se KONSTRUKTIVNĚ. Neděláš to slepě!
 `;
       }
     } catch (e) {
@@ -202,17 +206,20 @@ ${intel.recommendations.map(r => `  ${r.priority === "high" ? "⚠️" : "→"} 
     }
 
     const learningContext = globalLearnings.totalSent > 0 ? `
-═══ SELF-LEARNING DATA — ZÁVAZNÉ DIREKTIVY ═══
+═══ SELF-LEARNING DATA — CO SEM NAUČIL SEBE ═══
+(Toto jsou moje vlastní poznatky z analýzy. Aplikuj je konstruktivně, ne slepě!)
+
 Response rate: ${globalLearnings.responseRate}% (${globalLearnings.totalResponded}/${globalLearnings.totalSent})
 Průměrný čas odpovědi: ${globalLearnings.avgResponseTime} min
 Sell konverze: ${globalLearnings.sellConversionRate}% | Průměrný výdělek per sell: ${globalLearnings.avgRevenuePerSell} Kč
 Nejúspěšnější cenový bod: ${globalLearnings.bestSellingPrice > 0 ? globalLearnings.bestSellingPrice + " Kč" : "zatím neznámý"}
 
-Typy zpráv (response rate): ${Object.entries(globalLearnings.bestPurposes).sort((a, b) => b[1].rate - a[1].rate).map(([k, v]) => `${k}=${v.rate}%`).join(", ")}
-Timing (response rate): ${Object.entries(globalLearnings.bestTimings).sort((a, b) => b[1].rate - a[1].rate).map(([k, v]) => `${k}=${v.rate}%`).join(", ")}
+Co funguje nejlépe:
+  📨 Typy zpráv: ${Object.entries(globalLearnings.bestPurposes).sort((a, b) => b[1].rate - a[1].rate).slice(0, 3).map(([k, v]) => `${k} (${v.rate}%)`).join(" | ")}
+  ⏰ Timing: ${Object.entries(globalLearnings.bestTimings).sort((a, b) => b[1].rate - a[1].rate).slice(0, 3).map(([k, v]) => `${k} (${v.rate}%)`).join(" | ")}
 
-${globalLearnings.directives.length > 0 ? `DIREKTIVY — POVINNĚ SE JIMI ŘIĎ:
-${globalLearnings.directives.map(d => `  ★ ${d}`).join("\n")}` : ""}
+${globalLearnings.directives.length > 0 ? `Ověřené poznatky (které se opakovaly):
+${globalLearnings.directives.map(d => `  ✓ ${d}`).join("\n")}` : ""}
 ${marketDirectives}` : marketDirectives;
 
     const userMsgCount = sorted.filter(m => m.role === "user").length;
