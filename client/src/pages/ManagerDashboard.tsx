@@ -717,7 +717,8 @@ function VaultTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           category: newCategory,
-          tags: analysis.suggestedTags 
+          tags: analysis.suggestedTags,
+          applyStrategy: true  // Signal manager to auto-apply this recommendation
         }),
       });
       if (!res.ok) throw new Error("Update failed");

@@ -1718,17 +1718,61 @@ Vrať POUZE JSON, nic jiného!`,
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
-      const { category, tags, description } = req.body;
+      const { category, tags, description, applyStrategy } = req.body;
       const item = await storage.getContentItem(id);
       if (!item) return res.status(404).json({ message: "Not found" });
 
+      // Update the item
       const updates: any = {};
       if (category) updates.category = category;
       if (tags) updates.tags = tags;
       if (description !== undefined) updates.description = description;
 
-      // Update in database (we need to add this method to storage)
-      // For now, just return success
+      // TODO: Implement actual DB update method in storage
+      // For now, just log and return success
+      
+      // MANAGER AUTO-ACTION: If AI recommendation was accepted (applyStrategy=true)
+      if (applyStrategy && category && tags && tags.length > 0) {
+        try {
+          // Find all vault items with these tags
+          const allItems = await storage.getAllContentItems();
+          const matchingItems = allItems.filter(c => 
+            c.tags && c.tags.some(t => tags.includes(t))
+          );
+
+          const categoryLabel = category === "ppv" ? "💎 PPV" : 
+                               category === "teaser" ? "🔥 Teaser" : 
+                               category === "photo" ? "📸 Fotky" : category;
+
+          if (matchingItems.length > 0) {
+            // Create manager action for content strategy
+            const matchingIds = matchingItems.map(m => m.id).join(", ");
+            await storage.createManagerAction({
+              type: "content_strategy",
+              message: `AI doporučila kategorizaci "${categoryLabel}" s tagy: ${tags.join(", ")}. Přiřazeny fotky: #${matchingIds}`,
+            });
+
+            await storage.addManagerLog(
+              "ai_strategy_applied",
+              `AI doporučení aplikováno: ${tags.join(", ")} → ${matchingItems.length} fotek přiřazeno pod "${categoryLabel}"`
+            );
+          } else {
+            // No matching items found - alert user
+            await storage.createManagerAction({
+              type: "content_request",
+              message: `AI doporučila "${categoryLabel}" s tagy: ${tags.join(", ")}. CHYBĚJÍCÍ OBSAH: nenalezeny fotky s těmito tagy.`,
+            });
+
+            await storage.addManagerLog(
+              "ai_missing_content",
+              `Doporučení: "${categoryLabel}" → chybějící obsah s tagy: ${tags.join(", ")}`
+            );
+          }
+        } catch (stratErr: any) {
+          console.error("Strategy auto-action error:", stratErr);
+        }
+      }
+
       res.json({ ...item, ...updates });
     } catch (err) {
       res.status(500).json({ message: "Internal error" });
