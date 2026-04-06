@@ -644,6 +644,15 @@ function CustomersTab({ users, qc, selectedGroup, setSelectedGroup, initialFilte
 
 // ─── Tab: Content Vault ──────────────────────────────────────────────────────
 
+type AnalysisResult = {
+  category: "photo" | "ppv" | "teaser";
+  explicitness: "low" | "medium" | "high";
+  suggestedTags: string[];
+  reason: string;
+  itemId: number;
+  currentCategory: string;
+};
+
 function VaultTab() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -651,6 +660,8 @@ function VaultTab() {
   const [desc, setDesc] = useState("");
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("general");
+  const [analyzing, setAnalyzing] = useState<number | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
 
   const { data: items = [], isLoading } = useQuery<ContentItem[]>({
     queryKey: ["/api/vault/items"],
@@ -680,6 +691,42 @@ function VaultTab() {
     mutationFn: (id: number) => fetch(`/api/vault/items/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/vault/items"] }),
   });
+
+  const handleAnalyze = async (itemId: number, isImage: boolean) => {
+    if (!isImage) {
+      alert("Lze analyzovat pouze obrázky");
+      return;
+    }
+    setAnalyzing(itemId);
+    try {
+      const res = await fetch(`/api/vault/analyze-image/${itemId}`, { method: "POST" });
+      const data = await res.json();
+      setAnalysis(data);
+    } catch (err) {
+      alert("Chyba při analýze");
+    } finally {
+      setAnalyzing(null);
+    }
+  };
+
+  const handleApplyCategory = async (newCategory: string) => {
+    if (!analysis) return;
+    try {
+      const res = await fetch(`/api/vault/items/${analysis.itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          category: newCategory,
+          tags: analysis.suggestedTags 
+        }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      await qc.invalidateQueries({ queryKey: ["/api/vault/items"] });
+      setAnalysis(null);
+    } catch (err) {
+      alert("Chyba při aplikaci kategorie");
+    }
+  };
 
   const CATS = [
     { value: "general", label: "Obecné" },
@@ -754,14 +801,66 @@ function VaultTab() {
                 </div>
               )}
             </div>
-            <button onClick={() => deleteMut.mutate(item.id)} data-testid={`button-delete-vault-${item.id}`}
-              className="text-neutral-600 hover:text-red-400 text-sm transition-colors shrink-0">🗑️</button>
+            <div className="flex gap-1 shrink-0">
+              {item.mimeType.startsWith("image") && (
+                <button onClick={() => handleAnalyze(item.id, true)} disabled={analyzing === item.id} data-testid={`button-analyze-vault-${item.id}`}
+                  className="text-neutral-600 hover:text-emerald-400 text-sm transition-colors disabled:opacity-50">
+                  {analyzing === item.id ? "⏳" : "🔍"}
+                </button>
+              )}
+              <button onClick={() => deleteMut.mutate(item.id)} data-testid={`button-delete-vault-${item.id}`}
+                className="text-neutral-600 hover:text-red-400 text-sm transition-colors">🗑️</button>
+            </div>
           </div>
         ))}
         {!isLoading && items.length === 0 && (
           <div className="text-center text-neutral-600 py-8 text-sm">Vault je prázdný — nahraj svůj první obsah</div>
         )}
       </div>
+
+      {analysis && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+          onClick={() => setAnalysis(null)}>
+          <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} onClick={e => e.stopPropagation()}
+            className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-sm w-full space-y-4">
+            <div>
+              <p className="text-xs font-bold text-emerald-500 uppercase mb-1">🔍 AI Analýza fotky</p>
+              <p className="text-sm text-neutral-400">Item #{analysis.itemId}</p>
+            </div>
+
+            <div className="bg-neutral-800/50 rounded-lg p-3 space-y-2">
+              <div>
+                <p className="text-xs text-neutral-500 font-bold">Doporučená kategorie</p>
+                <p className="text-sm font-bold text-emerald-400">{CATS.find(c => c.value === analysis.category)?.label || analysis.category}</p>
+                <p className="text-[11px] text-neutral-500 mt-1">Explicitnost: <span className="text-emerald-400">{analysis.explicitness}</span></p>
+              </div>
+              <p className="text-xs text-neutral-400 italic">{analysis.reason}</p>
+            </div>
+
+            {analysis.suggestedTags.length > 0 && (
+              <div>
+                <p className="text-xs text-neutral-500 font-bold mb-2">Doporučené tagy</p>
+                <div className="flex flex-wrap gap-1">
+                  {analysis.suggestedTags.map((tag, i) => (
+                    <span key={i} className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={() => handleApplyCategory(analysis.category)} data-testid="button-apply-category"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-sm">
+                ✅ Přijmout
+              </button>
+              <button onClick={() => setAnalysis(null)} data-testid="button-cancel-analysis"
+                className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 font-bold py-2 rounded-lg text-sm">
+                ✕ Zavřít
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }

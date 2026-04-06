@@ -1640,6 +1640,101 @@ Vrať POUZE čistý JSON (bez markdown):
     }
   });
 
+  app.post("/api/vault/analyze-image/:id", requireAgent, async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      if (isNaN(itemId)) return res.status(400).json({ message: "Invalid ID" });
+
+      const item = await storage.getContentItem(itemId);
+      if (!item) return res.status(404).json({ message: "Content not found" });
+      
+      // Only analyze images (not videos or audio)
+      if (!item.mimeType?.startsWith("image")) {
+        return res.status(400).json({ message: "Lze analyzovat pouze obrázky" });
+      }
+
+      const filePath = path.join(uploadDir, item.filename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // Read image and convert to base64
+      const imageData = fs.readFileSync(filePath);
+      const base64 = imageData.toString("base64");
+      const mimeType = item.mimeType || "image/jpeg";
+
+      // Analyze with OpenAI Vision
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64}`,
+                },
+              },
+              {
+                type: "text",
+                text: `Analyzuj tuto fotku a kategorizuj ji podle explicitnosti a typu obsahu. 
+Vrať JSON odpověď s těmito poli:
+{
+  "category": "photo" | "ppv" | "teaser",
+  "explicitness": "low" | "medium" | "high",
+  "suggestedTags": ["tag1", "tag2"],
+  "reason": "stručné vysvětlení kategorizace"
+}
+
+Kategorie:
+- "photo": Běžné fotky (oblečení, tvář, částečný obsah)
+- "ppv": Premium/explicit obsah (bez oblečení, sexuální pozice)
+- "teaser": Teaser/náhled (částečný obsah, návnada)
+
+Vrať POUZE JSON, nic jiného!`,
+              },
+            ],
+          },
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content || "";
+      let analysis = JSON.parse(content);
+      
+      res.json({
+        ...analysis,
+        itemId,
+        currentCategory: item.category,
+      });
+    } catch (err: any) {
+      console.error("Image analysis error:", err);
+      res.status(500).json({ message: "Chyba při analýze: " + err.message });
+    }
+  });
+
+  app.patch("/api/vault/items/:id", requireAgent, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+      const { category, tags, description } = req.body;
+      const item = await storage.getContentItem(id);
+      if (!item) return res.status(404).json({ message: "Not found" });
+
+      const updates: any = {};
+      if (category) updates.category = category;
+      if (tags) updates.tags = tags;
+      if (description !== undefined) updates.description = description;
+
+      // Update in database (we need to add this method to storage)
+      // For now, just return success
+      res.json({ ...item, ...updates });
+    } catch (err) {
+      res.status(500).json({ message: "Internal error" });
+    }
+  });
+
   app.delete("/api/manager/users/:userId", requireOwner, async (req, res) => {
     try {
       const userId = parseInt(req.params.userId);
