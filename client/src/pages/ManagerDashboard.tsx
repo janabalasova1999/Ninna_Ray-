@@ -983,6 +983,155 @@ function TrendsTab() {
   );
 }
 
+// ─── Tab: Smart Recommendations ───────────────────────────────────────────────
+
+type SmartRecommendation = {
+  title: string;
+  reason: string;
+  action: string;
+  targetAudience: string;
+  selectedContent: (number | null)[];
+  missingContent: string | null;
+  expectedRevenue: string;
+  timeline: string;
+  priority: "vysoká" | "střední" | "nízká";
+};
+
+function SmartRecommendationsTab() {
+  const [recs, setRecs] = useState<SmartRecommendation[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState("");
+  const [immediateActions, setImmediateActions] = useState<string[]>([]);
+
+  const analyze = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/manager/smart-recommendations", { method: "POST" });
+      const data = await res.json();
+      setRecs(data.recommendations || []);
+      setSummary(data.strategySummary || "");
+      setImmediateActions(data.immediateActions || []);
+    } catch (err) {
+      alert("Chyba při generování doporučení");
+    }
+    setLoading(false);
+  };
+
+  const PRIO = { 
+    "vysoká": "text-red-400 bg-red-500/20 border-red-500/30",
+    "střední": "text-orange-400 bg-orange-500/20 border-orange-500/30",
+    "nízká": "text-blue-400 bg-blue-500/20 border-blue-500/30"
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-white font-bold">⚡ Smart Recommendations</p>
+          <p className="text-neutral-500 text-xs">AI vybírá konkrétní obsah a strategie přímo z tvého Vaultu</p>
+        </div>
+        <button onClick={analyze} disabled={loading} data-testid="button-generate-smart-recs"
+          className="text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl font-bold">
+          {loading ? "⏳ Analyzuji..." : "⚡ Generovat doporučení"}
+        </button>
+      </div>
+
+      {!recs && !loading && (
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+          <div className="text-5xl">⚡</div>
+          <p className="text-neutral-500 text-sm">Klikni "Generovat doporučení" pro inteligentní strategii</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+          <div className="text-5xl animate-pulse">🧠</div>
+          <p className="text-neutral-400 text-sm">Manager analyzuje vaši strategii...</p>
+        </div>
+      )}
+
+      {recs && !loading && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+          {summary && (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+              <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-2">📝 Strategie příštích 7 dní</p>
+              <p className="text-sm text-emerald-300 leading-relaxed">{summary}</p>
+            </div>
+          )}
+
+          {immediateActions.length > 0 && (
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+              <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-3">🎯 Okamžité akce</p>
+              <div className="space-y-2">
+                {immediateActions.map((action, i) => (
+                  <div key={i} className="flex gap-2 text-sm">
+                    <span className="text-emerald-400 font-bold shrink-0">→</span>
+                    <p className="text-neutral-300">{action}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {recs.map((rec, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+                className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-sm font-bold text-white">{rec.title}</h3>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${PRIO[rec.priority as keyof typeof PRIO]}`}>
+                        {rec.priority}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-500 mb-2">{rec.reason}</p>
+                  </div>
+                </div>
+
+                <div className="bg-neutral-800/30 rounded-lg p-3 space-y-2 text-sm">
+                  <div><span className="text-neutral-500 font-bold">Akce:</span> <span className="text-neutral-300">{rec.action}</span></div>
+                  <div><span className="text-neutral-500 font-bold">Pro:</span> <span className="text-emerald-400">{rec.targetAudience}</span></div>
+                  <div><span className="text-neutral-500 font-bold">Čas:</span> <span className="text-neutral-300">{rec.timeline}</span></div>
+                  <div><span className="text-neutral-500 font-bold">Revenue:</span> <span className="text-emerald-400">{rec.expectedRevenue}</span></div>
+                </div>
+
+                {rec.selectedContent && rec.selectedContent.length > 0 && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2">
+                    <p className="text-[10px] font-bold text-emerald-400 mb-1">✓ Vybrané z Vaultu:</p>
+                    <p className="text-xs text-emerald-300">Fotky/videa: #{rec.selectedContent.filter(c => c).join(", #")}</p>
+                  </div>
+                )}
+
+                {rec.missingContent && (
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-2">
+                    <p className="text-[10px] font-bold text-orange-400 mb-1">⚠ Chybějící obsah:</p>
+                    <p className="text-xs text-orange-300">{rec.missingContent}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2 flex-wrap">
+                  <button onClick={() => navigator.clipboard.writeText(rec.action)} 
+                    className="text-[11px] font-bold bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg transition-colors" data-testid={`copy-action-${i}`}>
+                    📋 Kopírovat akci
+                  </button>
+                  <button onClick={() => {
+                    const fullText = `${rec.title}\n\n${rec.action}\n\nPro: ${rec.targetAudience}\nPříjem: ${rec.timeline}`;
+                    navigator.clipboard.writeText(fullText);
+                    alert("✓ Doporučení zkopírováno!");
+                  }} className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors" data-testid={`note-rec-${i}`}>
+                    📝 Poznámka
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 // ─── Tab: Broadcast ──────────────────────────────────────────────────────────
 
 function BroadcastTab() {
@@ -2900,7 +3049,7 @@ function SubscriptionHealthTab() {
 
 export default function ManagerDashboard() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "customers" | "vault" | "trends" | "broadcast" | "payments" | "market" | "analytics" | "report" | "revenue" | "engagement" | "weekly" | "subscriptions">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "customers" | "vault" | "trends" | "smart" | "broadcast" | "payments" | "market" | "analytics" | "report" | "revenue" | "engagement" | "weekly" | "subscriptions">("overview");
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [initialFilter, setInitialFilter] = useState<string | undefined>(undefined);
   const qc = useQueryClient();
@@ -2926,6 +3075,7 @@ export default function ManagerDashboard() {
     { id: "customers" as const, icon: "👥", label: "Zákazníci" },
     { id: "vault" as const, icon: "📦", label: "Vault" },
     { id: "trends" as const, icon: "📊", label: "Trendy" },
+    { id: "smart" as const, icon: "⚡", label: "Smart Akce" },
     { id: "broadcast" as const, icon: "📢", label: "Broadcast" },
     { id: "payments" as const, icon: "💳", label: "Platby" },
     { id: "analytics" as const, icon: "📉", label: "Analytika" },
@@ -2954,9 +3104,6 @@ export default function ManagerDashboard() {
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-500/20 border border-pink-500/30 text-pink-400" title="E-Bot aktivní">
               🤖 {users.filter(u => u.botEnabled).length}
             </span>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 border border-violet-500/30 text-violet-400" title="Odemčený obsah">
-              🔓 {users.reduce((s, u) => s + (u.unlockedCount || 0), 0)}
-            </span>
           </div>
         </div>
         <button onClick={logout} data-testid="button-logout" className="text-neutral-500 hover:text-white text-xs transition-colors">Odhlásit</button>
@@ -2980,6 +3127,7 @@ export default function ManagerDashboard() {
         {activeTab === "customers" && <CustomersTab users={users} qc={qc} selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} initialFilter={initialFilter} />}
         {activeTab === "vault" && <VaultTab />}
         {activeTab === "trends" && <TrendsTab />}
+        {activeTab === "smart" && <SmartRecommendationsTab />}
         {activeTab === "broadcast" && <BroadcastTab />}
         {activeTab === "payments" && <PaymentsTab users={users} />}
         {activeTab === "analytics" && <AnalyticsTab />}

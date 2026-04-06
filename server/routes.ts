@@ -1299,6 +1299,112 @@ Analyzuj a vrať JSON (bez markdown, čistý JSON):
     }
   });
 
+  // ─── Smart recommendations with vault items selection ────────────────────────
+
+  app.post("/api/manager/smart-recommendations", requireOwner, async (_req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const allConvs = await storage.getAllConversations();
+      const allMsgs = await storage.getAllMessages();
+      const vaultItems = await storage.getAllContentItems();
+      const intel = await getMarketIntelligence();
+
+      // Collect user interests and what they're buying
+      const userProfiles = allUsers
+        .filter(u => u.aiProfile)
+        .map(u => {
+          const p = u.aiProfile as any;
+          return {
+            interests: p?.interests || [],
+            status: p?.status || "new",
+            buyingPotential: p?.buyingPotential || "unknown",
+          };
+        });
+
+      const recentTopics = allMsgs
+        .filter(m => m.role === "user")
+        .slice(0, 200)
+        .map(m => m.content)
+        .join("\n");
+
+      // Build vault catalog for AI to select from
+      const vaultCatalog = vaultItems
+        .map(item => ({
+          id: item.id,
+          type: item.mimeType?.startsWith("video") ? "video" : 
+                 item.mimeType?.startsWith("image") ? "photo" : "other",
+          category: item.category,
+          tags: item.tags,
+          description: item.description || item.originalName,
+          usedCount: item.timesUsed,
+        }))
+        .slice(0, 50);
+
+      const prompt = `Jsi strategický manažer pro digitální agenturu "Ninna Ray". Tvým úkolem je dát KONKRÉTNÍ, AKČNÍ doporučení co DĚLAT v příštích dnech.
+
+AKTUÁLNÍ STAV AGENTURY:
+- Uživatelé: ${allUsers.length}
+- Konverzace: ${allConvs.length}
+- Zprávy: ${allMsgs.length}
+- Obsah ve Vaultu: ${vaultItems.length} položek
+
+MARKET INTELLIGENCE:
+- Trendy: ${intel.trendingCategories?.join(", ") || "N/A"}
+- Nejoblíbenější cena: ${intel.bestSellingPriceRange || "N/A"}
+- Nejprodávanější typ: ${intel.topContentTypes?.join(", ") || "N/A"}
+
+CO ZÁKAZNÍCI ZAJÍMÁ:
+${userProfiles
+  .slice(0, 10)
+  .map(p => `- Interests: ${p.interests.join(", ")} | Status: ${p.status} | Potential: ${p.buyingPotential}`)
+  .join("\n")}
+
+POSLEDNÍ TÉMATA:
+${recentTopics.slice(0, 1500)}
+
+DOSTUPNÝ OBSAH V VAULTU:
+${JSON.stringify(vaultCatalog, null, 2)}
+
+VRAŤ KONKRÉTNÍ DOPORUČENÍ (čistý JSON, bez markdown):
+{
+  "recommendations": [
+    {
+      "title": "<konkrétní akce - např. 'Vytvořit live stream PPV'>",
+      "reason": "<proč to dělat (market data + zákazníci)>",
+      "action": "<konkrétní krok - co udělat>",
+      "targetAudience": "<pro koho (segment zákazníků)>",
+      "selectedContent": [<id fotky/videa z Vaultu co vybírám, nebo null pokud chybí>],
+      "missingContent": "<co chybí (pokud vybírám obsah z Vaultu ale chybí něco)>",
+      "expectedRevenue": "<jaký revenue potenciál>",
+      "timeline": "<kdy to udělat - tento týden/měsíc>",
+      "priority": "vysoká|střední|nízká"
+    }
+  ],
+  "strategySummary": "<3-4 věty co koukat v příštích 7 dnech>",
+  "immediateActions": ["<akce 1 - dnes/zítra>", "<akce 2>", "<akce 3>"],
+  "generatedAt": "${new Date().toISOString()}"
+}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      
+      await storage.addManagerLog(
+        "smart_recommendations_generated",
+        `Vygenerováno ${result.recommendations?.length || 0} doporučení strategii`
+      );
+
+      res.json(result);
+    } catch (err: any) {
+      console.error("Smart recommendations error:", err);
+      res.status(500).json({ message: "Chyba při generování doporučení: " + err.message });
+    }
+  });
+
   // ─── Pricing strategy analysis ─────────────────────────────────────────────
 
   app.post("/api/manager/pricing-strategy", requireOwner, async (_req, res) => {
@@ -1722,14 +1828,17 @@ Vrať POUZE JSON, nic jiného!`,
       const item = await storage.getContentItem(id);
       if (!item) return res.status(404).json({ message: "Not found" });
 
-      // Update the item
+      // Update the item in DB
       const updates: any = {};
       if (category) updates.category = category;
       if (tags) updates.tags = tags;
       if (description !== undefined) updates.description = description;
 
-      // TODO: Implement actual DB update method in storage
-      // For now, just log and return success
+      // Save to database
+      if (Object.keys(updates).length > 0) {
+        await storage.updateContentItem(id, updates);
+        console.log(`[Vault] Item #${id} updated: ${Object.keys(updates).join(", ")}`);
+      }
       
       // MANAGER AUTO-ACTION: If AI recommendation was accepted (applyStrategy=true)
       if (applyStrategy && category && tags && tags.length > 0) {

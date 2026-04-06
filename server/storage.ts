@@ -22,6 +22,7 @@ export interface IStorage {
   createContentItem(item: InsertContentItem): Promise<ContentItem>;
   getAllContentItems(): Promise<ContentItem[]>;
   getContentItem(id: number): Promise<ContentItem | undefined>;
+  updateContentItem(id: number, updates: Partial<{ category: string; tags: string[]; description: string }>): Promise<void>;
   deleteContentItem(id: number): Promise<void>;
   incrementContentUsage(id: number): Promise<void>;
   createManagerAction(data: { userId: number | null; type: string; message?: string; photoId?: number; price?: number; purpose?: string; timing?: string }): Promise<ManagerAction>;
@@ -177,6 +178,16 @@ export class DatabaseStorage implements IStorage {
   async getContentItem(id: number): Promise<ContentItem | undefined> {
     const [item] = await db.select().from(contentItems).where(eq(contentItems.id, id));
     return item;
+  }
+
+  async updateContentItem(id: number, updates: Partial<{ category: string; tags: string[]; description: string }>): Promise<void> {
+    const updateData: any = {};
+    if (updates.category) updateData.category = updates.category;
+    if (updates.tags) updateData.tags = updates.tags;
+    if (updates.description) updateData.description = updates.description;
+    if (Object.keys(updateData).length > 0) {
+      await db.update(contentItems).set(updateData).where(eq(contentItems.id, id));
+    }
   }
 
   async deleteContentItem(id: number): Promise<void> {
