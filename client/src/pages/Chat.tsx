@@ -3,18 +3,32 @@ import { useChat } from "@/hooks/use-chat";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, LogOut, ChevronLeft, Crown } from "lucide-react";
+import { Send, LogOut, ChevronLeft, Crown, Mic, Loader2, Wand2, Bot, Sparkles } from "lucide-react";
+import { useVoice } from "@/hooks/use-voice";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 
 import ninnaPhoto from "@assets/IMG_4700_1768775323977.jpeg";
 
 export default function Chat() {
   const [user, setUser] = useState<any>(null);
   const [, setLocation] = useLocation();
-  const { messages, sendMessage, isTyping, initConversation, activeConversationId } = useChat({ userId: user?.id });
+
+  const { data: botStatus } = useQuery<{ isSubscribed: boolean; botEnabled: boolean; unlockedCount: number }>({
+    queryKey: ["/api/bot/status"],
+    enabled: !!user?.id,
+    retry: false,
+  });
+  const { messages, sendMessage, isTyping, initConversation, activeConversationId, connectionError, clearError } = useChat({ userId: user?.id });
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { isRecording, isTranscribing, startRecording, stopRecording } = useVoice({
+    onTranscription: (text) => {
+      sendMessage(text);
+    },
+  });
 
   useEffect(() => {
     const savedUser = localStorage.getItem("ninna_user");
@@ -75,12 +89,39 @@ export default function Chat() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {botStatus?.isSubscribed ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-pink-400 hover:text-pink-300 relative"
+              onClick={() => setLocation("/bot")}
+              data-testid="button-ebot"
+              title="Ninna E-Bot"
+            >
+              <Bot className="w-5 h-5" />
+              {(botStatus?.unlockedCount ?? 0) > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-pink-500 rounded-full" />
+              )}
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-neutral-600 hover:text-neutral-400"
+              onClick={() => setLocation("/payment")}
+              data-testid="button-ebot-locked"
+              title="E-Bot — vyžaduje předplatné"
+            >
+              <Bot className="w-5 h-5" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
             className="text-amber-400 hover:text-amber-300"
             onClick={() => setLocation("/payment")}
             data-testid="button-vip"
+            title="VIP & Předplatné"
           >
             <Crown className="w-5 h-5" />
           </Button>
@@ -112,31 +153,78 @@ export default function Chat() {
         {isTyping && !messages.find(m => m.isTyping) && (
           <ChatBubble role="assistant" content="" isTyping={true} />
         )}
+
+        {connectionError && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-2 bg-red-500/15 border border-red-500/30 rounded-2xl px-4 py-3 text-sm text-red-300"
+            data-testid="text-connection-error"
+          >
+            <span className="text-base">⚠️</span>
+            <span className="flex-1">{connectionError}</span>
+            <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors text-xs font-bold ml-2">✕</button>
+          </motion.div>
+        )}
         
         <div ref={scrollRef} className="h-4" />
       </main>
 
       <footer className="p-4 bg-black/60 backdrop-blur-xl border-t border-white/5 z-20">
         <form onSubmit={handleSend} className="flex items-center gap-2">
+           <Button
+             type="button"
+             size="icon"
+             data-testid="button-voice-record"
+             disabled={isTranscribing}
+             onPointerDown={(e) => {
+               e.preventDefault();
+               if (!isRecording && !isTranscribing) startRecording();
+             }}
+             onPointerUp={(e) => {
+               e.preventDefault();
+               if (isRecording) stopRecording();
+             }}
+             onPointerLeave={() => {
+               if (isRecording) stopRecording();
+             }}
+             className={`flex-shrink-0 rounded-xl transition-all ${
+               isRecording
+                 ? "bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30"
+                 : isTranscribing
+                   ? "bg-white/10 text-neutral-400"
+                   : "bg-white/5 text-neutral-400 border border-white/10"
+             }`}
+           >
+             {isTranscribing ? (
+               <Loader2 className="w-5 h-5 animate-spin" />
+             ) : (
+               <Mic className="w-5 h-5" />
+             )}
+           </Button>
            <div className="flex-1 relative">
              <Input
                value={inputValue}
                onChange={(e) => setInputValue(e.target.value)}
-               placeholder="Write something sexy..."
+               placeholder={isRecording ? "Recording..." : isTranscribing ? "Transcribing..." : "Write something sexy..."}
+               disabled={isRecording || isTranscribing}
                className="h-12 rounded-2xl bg-white/5 border-white/10 text-white focus:border-pink-500/50 focus:ring-pink-500/20 px-4 transition-all"
+               data-testid="input-chat-message"
              />
              <Button 
                type="submit" 
                size="icon"
                disabled={!inputValue.trim()}
-               className="absolute right-1 top-1 h-10 w-10 rounded-xl bg-pink-600 text-white hover:bg-pink-500 disabled:opacity-30 transition-all shadow-lg shadow-pink-600/20"
+               data-testid="button-send-message"
+               className="absolute right-1 top-1 h-10 w-10 rounded-xl bg-pink-600 text-white disabled:opacity-30 transition-all shadow-lg shadow-pink-600/20"
              >
                <Send className="w-4 h-4" />
              </Button>
            </div>
         </form>
         <p className="text-[10px] text-neutral-600 text-center mt-3 uppercase tracking-widest font-bold">
-          Message count tracked for loyalty rewards
+          {isRecording ? "Hold to record, release to send" : "Message count tracked for loyalty rewards"}
         </p>
       </footer>
     </div>

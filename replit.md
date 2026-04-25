@@ -2,144 +2,102 @@
 
 ## Overview
 
-Ninna Ray is an AI-powered OnlyFans agency management platform. It provides a Czech-language AI chat companion (Ninna_Ray🍒) that chats with fans using GPT-4o with SSE streaming and human-like "seen/typing" delays. The app includes a full 3-role agency system: Customer (public chat), Agent (manual reply/takeover), Owner (full admin + AI Manager).
+Ninna Ray is an AI-powered digital agency management platform designed to manage fan interactions and monetize content, primarily targeting the Czech market. It features a Czech-language AI chat companion (Ninna_Ray🍒) that uses GPT-4o with SSE streaming and human-like delays for fan engagement. The platform incorporates a 3-role agency system (Customer, Agent, Owner) and handles all monetization in-app via Stripe. Its core purpose is to provide an autonomous, self-learning AI manager that optimizes user engagement and revenue through personalized interactions and content offers.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language. Czech language UI.
 
-## Routes & Roles
-
-- `/` — Landing page (customer entry)
-- `/chat` — Customer chat with Ninna AI
-- `/agent` — Agent dashboard (password: `agent2025`) — view conversations, takeover AI, send manual replies
-- `/admin` — Owner dashboard (password: `owner2025`) — stats, users, conversations viewer
-- `/manager` — AI Manager (owner login) — autonomous customer analysis, engagement scoring, content recommendations
-
 ## System Architecture
 
-### Frontend
-- **Framework**: React 18 + TypeScript
-- **Routing**: Wouter
-- **State**: TanStack React Query + React hooks
-- **Styling**: Tailwind CSS v3, Framer Motion animations
-- **UI**: Shadcn/ui (Radix primitives)
-- **Build**: Vite → `dist/public/`
+### Core Features
+- **AI Chat Companion**: Ninna_Ray🍒, using GPT-4o for natural, streaming conversations with human-like delays.
+- **Role-Based Access**:
+    - **Customer**: Engages with Ninna AI.
+    - **Agent**: Manually intervenes in conversations, views chats.
+    - **Owner**: Full administrative control, access to AI Manager, analytics.
+- **In-App Monetization**: Integrated Stripe for seamless content purchases within the chat.
+- **Autonomous AI Manager**: A self-running engine that analyzes user behavior, generates, and executes personalized actions (e.g., content offers, messages) to optimize engagement and revenue. This includes self-learning, anti-spam, revenue optimization, and per-user memory.
+- **Content Vault**: Stores and categorizes multimedia content, which the AI can automatically assign to scenarios and offer to users.
 
-### Backend
-- **Framework**: Express + TypeScript (tsx runtime)
-- **AI**: OpenAI GPT-4o via Replit AI Integrations (streaming SSE)
-- **Auth**: express-session with role-based access (Customer/Agent/Owner)
-- **Middleware**: `requireAgent` (agent+owner), `requireOwner` (owner only)
+### Technical Stack
+- **Frontend**: React 18, TypeScript, Wouter for routing, TanStack React Query for state management, Tailwind CSS v3, Framer Motion for animations, Shadcn/ui for UI components. Built with Vite.
+- **Backend**: Express.js, TypeScript (tsx runtime).
+- **AI Integration**: OpenAI GPT-4o via Replit AI Integrations (streaming SSE).
+- **Authentication**: `express-session` with role-based access control.
+- **Database**: PostgreSQL with Drizzle ORM. Key tables include `users`, `conversations`, `messages`, `content_items`, `manager_actions`, `manager_log`.
+- **Deployment**: Optimized for Autoscale, serving static files from `dist/public/` with SPA catch-all routing.
 
-### Database
-- **PostgreSQL** via Drizzle ORM
-- **Tables**: `users` (with `aiProfile` jsonb, `aiProfileUpdatedAt`), `conversations` (with `manualMode`, `assignedAgent`), `messages`, `content_items` (vault), `manager_actions` (action queue), `manager_log` (engine activity log)
-- **Migrations**: `npx drizzle-kit push`
+### AI Manager System Design
+- **Autonomous Operation**: Runs every 10 minutes, analyzing all users to generate and execute actions.
+- **Self-Management**: Automatically handles cleanup (test accounts, duplicates).
+- **Self-Learning**: Adapts strategies based on user response rates, message performance, and average response times over a 72-hour window.
+- **Anti-Spam**: Implements message rate limits and intelligent deferral of actions to prevent oversaturation.
+- **Revenue Optimization (PPV Model)**: Features a deterministic pricing engine (`server/market-intelligence.ts`) that uses CZK market benchmarks and internal conversion data to generate personalized price offers. PPV (Pay-Per-View) model — customers pay per individual content item, encouraging multiple purchases. Price tiers: PPV Entry (49-99 Kč), PPV Standard (129-249 Kč), PPV Premium (299-499 Kč), PPV VIP/Bundle (599-1499 Kč). AI Manager dynamically adjusts within tiers based on user history and sensitivity.
+- **Per-User Memory**: Builds persistent profiles including communication patterns, emotional triggers, `whatWorks`/`whatFails` insights, `relationshipStage`, `nextMilestone`, `priceSensitivity`, `sellStyle`, and `suggestedPrice`. These profiles inform both manager analysis and real-time chat interactions.
+- **Human-like Chat Behavior**: Incorporates variable typing delays, engagement-aware monetization (offers content only to engaged users), and prompt instructions for natural language nuances.
+- **Auto-Execution**: Actions generated by the AI Manager are directly sent to customer conversations, either immediately or via a delayed queue.
+- **Self-Improving Engine**: `selfLearn()` analyzes response rates, sell conversion, best timing/purpose, and generates binding DIRECTIVES that are injected into the GPT prompt. Market intelligence recommendations from `getStrategyRecommendations()` are fed as STRATEGIC COMMANDS. The AI autonomously adjusts its approach based on what works and what doesn't.
+- **Owner Dashboard**: Provides comprehensive insights into engine status, autonomous feature indicators, self-learning insights, customer revenue profiles, and a log of auto-sent messages.
 
-### AI Manager System — Fully Autonomous Self-Managing Engine
-- **Fully autonomous** — runs on 10-minute interval, analyzes ALL users, generates actions AND EXECUTES THEM automatically
-- **Self-managing**: Engine cleans up after itself — detects test accounts, duplicate users, and removes them automatically
-- **Self-learning**: Tracks response rates (which messages got replies), adjusts strategy when response rate drops
-- **Auto-cleanup**: Runs on resume + every 60 min — deletes test accounts (TestUser, TestPayer, etc.) and empty duplicates
-  - Groups by `normalizeName()` — if "Žerik" has 5 duplicates with 0 messages, deletes them, keeps the one with messages
-- **Auto-execution**: Engine sends messages directly to customer conversations — no manual intervention needed
-  - `timing: "teď"` → sent immediately after analysis
-  - `timing: "za 1h"` / `"za 3h"` → queued in delayed queue, processed every 30s
-  - `timing: "dnes večer"` → 4h delay; `"zítra"` → 12h delay
-- **Pause/Resume**: Owner can pause engine via `POST /api/manager/engine-pause` — stops all auto-sending
-- **On resume sequence**: autoCleanup(1s) → backlog(3s) → selfLearn(4s) → fullScan(6s)
-- **Backlog sweep**: On engine start, processes all pending actions from previous runs
-- **Engine file**: `server/manager-engine.ts` — starts on server boot, runs `runFullScan()` every 10 min
-- **Auto-reanalyze**: After each chat message, triggers re-analysis if profile > 5 min old
-- **Delete user API**: `DELETE /api/manager/users/:userId` — cascade deletes conversations, messages, actions
-- **Adaptive personalization** — builds persistent individual profiles per customer:
-  - `communicationPatterns`: msg length, response speed, emoji usage, tone, peak hours
-  - `emotionalTriggers`: what makes them respond, buy, or disengage
-  - `whatWorks` / `whatFails`: learned from interaction history, preserved across analyses
-  - `relationshipStage`: nový/budování/stabilní/monetizace/reaktivace
-  - `nextMilestone`: what's the next goal for this relationship
-- **Previous profile as memory**: Each analysis receives the previous profile so AI builds on it, not from scratch
-- **Strictly actionable output**: Every analytical block (personality, interests, warnings) must convert to concrete messages with timing, purpose, and photo assignments
-- **No generic responses**: AI must personalize based on conversation history, style, and emotional triggers
-- **Action queue persisted**: Actions stored in `manager_actions` DB table with status tracking (pending/done/dismissed/failed)
-- **Auto-sent marker**: Actions executed by engine have `result: "auto-sent"` in DB
-- Strategy logic: high engagement → SELL, medium → BUILD, low → HOOK
-- **Owner Dashboard**:
-  - Engine status with ⏸ Pause / ▶ Resume button
-  - Auto-sent message log with photos, badges, timestamps
-  - Pending actions (if engine was paused) with manual "Odesláno" / "Zahodit" buttons
-  - Vault photo thumbnails inline in action cards
-  - Clickable status boxes navigate to filtered customer list
-  - Strategy/buying potential/relationship stage breakdowns
+### Stripe Integration
+- **In-App PPV Sales**: All payment processes occur within the application via Stripe Checkout.
+- **Dynamic Pricing**: `POST /api/stripe/content-checkout` creates dynamic prices for content items in CZK.
+- **AI Manager Auto-Sell**: AI Manager follows playbook-driven sell flow (hint→lock→sell between messages 3-10, upsell ladder by purchase count). Generates Stripe checkout links embedded in chat via `[UNLOCK_CONTENT:photoId:price:url]` markers.
+- **ChatBubble Payment Buttons**: Frontend renders payment markers as styled "Odemknout za X Kč" buttons with Stripe redirect.
+- **Webhook Handling**: Processes `checkout.session.completed` (marks payment completed + sends confirmation message to chat with `[UNLOCKED_CONTENT:id]`), `payment_intent.succeeded`, `payment_intent.payment_failed` events.
+- **Customer Flow**: Chat → AI tease → PPV content offer with Stripe button → Stripe Checkout → webhook → confirmation in chat + content unlock.
 
-### Content Vault
-- Upload photos/videos/audio content with tags and categories
-- Content stored in `uploads/` directory, metadata in `content_items` table
-- AI automatically categorizes photos (teasing/cute/explicit/casual) and assigns to scenarios
-- Track usage count per content item
-- Vault photos displayed inline in action cards when engine recommends them
+### UI/UX
+- Utilizes Shadcn/ui (Radix primitives) for a modern and accessible interface.
+- Styling with Tailwind CSS v3.
+- Animations powered by Framer Motion.
 
-### Key API Endpoints
-- `POST /api/manager/analyze/:userId` — trigger manual analysis (uses engine)
-- `GET /api/manager/engine-status` — engine running state, paused state, last/next scan, recent logs, delayed count
-- `POST /api/manager/engine-pause` — pause/resume engine (`{ paused: true/false }`)
-- `GET /api/manager/actions` — list pending/done actions
-- `PATCH /api/manager/actions/:id` — update action status
-- `GET /api/manager/logs` — engine activity log
-- `GET /api/manager/overview`, `POST /api/manager/analyze-all`, `POST /api/manager/trends`, `POST /api/manager/broadcast`
+## External Dependencies
 
-### Deployment
-- **Target**: Autoscale
-- **Build**: `npx vite build`
-- **Run**: `NODE_ENV=production npx vite build && NODE_ENV=production tsx server/index.ts`
-- **Production**: Static files served from `dist/public/`, SPA catch-all routing, secure cookies with trust proxy
+- **OpenAI**: GPT-4o via Replit AI Integrations for AI chat and manager analysis.
+- **Stripe**: For in-app payment processing and subscriptions.
+- **PostgreSQL**: As the primary database.
+- **Vite**: For frontend asset bundling.
+- **Express.js**: Backend web application framework.
+- **Drizzle ORM**: For database interaction.
+- **Wouter**: For client-side routing.
+- **TanStack React Query**: For server state management in React.
+- **Tailwind CSS**: For utility-first CSS styling.
+- **Framer Motion**: For animations.
+- **Shadcn/ui**: For UI components based on Radix primitives.
+- **`express-session`**: For session management and authentication.
+- **Recharts**: For data visualization charts in analytics dashboard.
 
-## Environment Variables
+## Critical Build Note
 
-- `DATABASE_URL` — PostgreSQL connection string
-- `AI_INTEGRATIONS_OPENAI_API_KEY` — OpenAI API key (via Replit integration)
-- `AI_INTEGRATIONS_OPENAI_BASE_URL` — OpenAI base URL (via Replit integration)
-- `SESSION_SECRET` — Express session secret
-- `AGENT_PASSWORD` — Password for agent login (default: `agent2025`)
-- `OWNER_PASSWORD` — Password for owner login (default: `owner2025`)
+**`NODE_ENV=production` is set globally in this Replit environment.** This means:
+- The Express server serves from `dist/public/` (pre-built Vite bundle), NOT from the Vite dev server.
+- **Every frontend source code change requires a rebuild:** `NODE_ENV=production npx vite build`
+- After rebuilding, restart the "Start application" workflow to serve the new bundle.
+- Backend (Express/server) changes take effect immediately on restart without a rebuild.
 
-### Stripe Payment Integration
-- **Status**: Infrastructure ready, waiting for Stripe account connection
-- **Stripe not yet connected**: App works fine without it — shows "Platby se připravují" to customers
-- **When connected**: Run `npx tsx scripts/seed-products.ts` to create products, then payments activate automatically
-- **Webhook**: Route registered BEFORE `express.json()` in `server/index.ts`
-- **Checkout**: Auto-detects subscription vs one-time payment mode from price type
-- **Products planned**: VIP subscription (monthly/yearly CZK), PPV content, Custom content, Tips
-- **Customer flow**: Chat → VIP crown button → /payment → Stripe Checkout → /payment/success
-- **Owner view**: Manager dashboard → Platby tab — shows Stripe status, products, paying customers
-- **Files**: `server/stripeClient.ts`, `server/webhookHandlers.ts`, `server/stripeService.ts`, `scripts/seed-products.ts`
-- **Pages**: `/payment`, `/payment/success`, `/payment/cancel`
+## Virtual Twin / E-Bot System
+- **Twin Blueprint**: Full Virtual Twin system with 3 subscription tiers (BASIC=Level 1, VIP=Level 2, PREMIUM=Level 3).
+- **Capability Levels** (`server/stripeService.ts`): `TWIN_CAPABILITIES` maps level → feature flags (basicChat, purchaseHistory, skinUnlocking, proactiveRecommendations, notifications, visualCustomization, advancedCustomization, exclusiveContent, prioritySupport, planning).
+- **Subscription Gate** (`client/src/pages/EBot.tsx`): Wardrobe + Ninna display + tier capabilities panel behind Stripe subscription paywall.
+- **Tier UI** (`EBot.tsx`): Shows current tier badge, capabilities checklist (enabled/locked), upgrade button to next tier with price.
+- **Auto Avatar Elements** (`storage.ts`): `autoCreateAvatarElements()` auto-creates skin elements from purchased content items based on tags (outfit, hair, background, expression, accessory).
+- **Webhook Capability Assignment** (`webhookHandlers.ts`): On subscription activation, determines capability level from price tier and sets it. On content purchase, auto-creates avatar elements before unlocking.
+- **Individual Photo Sales**: Minimum price lowered to 49 CZK. AI prompt uses progressive pricing strategy (entry → standard → premium). Default suggested price changed from 249 to 99 CZK.
+- **Bot Status API** (`GET /api/bot/status`): Returns `capabilityLevel`, `capabilities` object, `currentPlan`, `nextPlan` (for upgrade prompts).
+- **Manager Overview Stats** (`GET /api/manager/overview`): Returns `isSubscribed`, `botEnabled`, `unlockedCount` per user.
+- **E-Bot Dashboard Panel** (`client/src/pages/ManagerDashboard.tsx`): In main header, always-visible badges show VIP subscribers, bot-active users, total unlocked assets.
+- **Storage Methods**: `getAllAvatarInstances()`, `getUnlockedAssetCountsByUser()`, `updateCapabilityLevel()`, `autoCreateAvatarElements()` in `server/storage.ts`.
 
-## Key Files
+## Chat Connection Error Handling
+- `client/src/hooks/use-chat.ts`: Exposes `connectionError` state and `clearError` function when SSE stream fails.
+- `client/src/pages/Chat.tsx`: Renders a visible red error banner (`data-testid="text-connection-error"`) when connection fails — no longer silently swallowed.
 
-- `server/routes.ts` — All API routes (auth, chat, agent, admin, manager, stripe)
-- `server/manager-engine.ts` — Autonomous AI manager engine (scan, analyze, auto-execute, delayed queue)
-- `server/index.ts` — Express setup, session config, Stripe webhook + init, engine startup
-- `server/storage.ts` — Database CRUD operations (incl. manager_actions, manager_log, stripe customer ID)
-- `server/stripeClient.ts` — Stripe credentials from Replit connections API
-- `server/stripeService.ts` — Stripe API operations (checkout, portal, products query)
-- `server/webhookHandlers.ts` — Stripe webhook processing via stripe-replit-sync
-- `server/static.ts` — Production static file serving
-- `shared/schema.ts` — Drizzle schema + Zod types (users with stripeCustomerId, managerActions, managerLog)
-- `client/src/pages/ManagerDashboard.tsx` — AI Manager dashboard (overview, customers, vault, trends, broadcast, payments)
-- `client/src/pages/Payment.tsx` — Customer payment page with product cards
-- `scripts/seed-products.ts` — Creates products in Stripe (run after connecting)
-
-## Critical Architecture Notes
-
-- `normalizeName()` = trim + lowercase + NFD + strip diacritics — "Žerik" groups with "Zerik"
-- Sidebar badge uses `STATUS_CONFIG[bestStatus].label` (short: "🔥 Horký") NOT `aiProfile.statusLabel`
-- Backend vault upload: field `files` (not `file`), uses `upload.array("files", 50)`
-- Analysis: last 200 messages (slice(-200)), includes vault photo list + previous profile as memory context
-- Old profiles (without `actionQueue`) fall back to showing `suggestedMessages`
-- Auth: owner login `POST /api/auth/login` with `{ password: "owner2025", role: "owner", username: "Manager" }`
-- `package.json` uses `"type": "module"` — CommonJS scripts need `.cjs` extension
-- Engine auto-execution: `executeAction()` calls `storage.createMessage()` directly into conversation
-- Delayed queue: in-memory array, processed every 30s, checks if action still "pending" before executing
-- Engine pause: `setEnginePaused(true)` stops all auto-sending, backlog processing, and delayed queue
+## Analytics & Reporting System
+- **Analytics Engine** (`server/analytics-engine.ts`): Computes daily timelines, sales funnel, content performance, user LTV, and automated daily reports
+- **Dashboard Tabs** (`/manager`):
+  - **Analytika** tab: Revenue timeline chart (30 days), messages/day bar chart, new/active users line chart, animated sales funnel (Cold→Warm→Hot→Platící), content vault performance ranking, user LTV table with predicted 6-month value
+  - **Report** tab: AI-generated 24h summary — revenue, transactions, new users, active users, messages, funnel snapshot, engine action stats, response rate, avg engagement, strategic AI recommendations
+  - **Trh** tab: Market intelligence — benchmarks, pricing tiers, content pricing, customer segments, lead sources
+- **API Routes**: `/api/manager/analytics/timeline`, `/api/manager/analytics/funnel`, `/api/manager/analytics/content-performance`, `/api/manager/analytics/ltv`, `/api/manager/analytics/report`

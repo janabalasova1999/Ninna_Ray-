@@ -1,0 +1,85 @@
+TASK: Autonomní AI Manager (self-running monetization system)
+
+1. Autonomní režim (CORE)
+- Systém musí fungovat plně autonomně bez nutnosti zásahu.
+- Automaticky:
+  - analyzuje uživatele
+  - vede konverzace
+  - rozhoduje kdy build / hook / sell
+  - nabízí a prodává obsah
+- Uživatel (admin) má pouze dohled (read-only + override možnost).
+
+2. Continuous learning (self-improving AI)
+- Každá konverzace se ukládá a analyzuje.
+- Systém se zlepšuje na základě:
+  - úspěšných prodejů
+  - délky konverzací
+  - engagementu
+- Implementuj:
+  - scoring zpráv (co funguje vs co ne)
+  - automatickou optimalizaci textů
+  - adaptivní strategie (víc sell tam, kde to funguje)
+
+3. Per-user memory (personalizace)
+- Každý user musí mít profil:
+  - preference
+  - styl komunikace
+  - historie nákupů
+  - citlivost na cenu
+- AI přizpůsobuje:
+  - tón zpráv
+  - tempo
+  - typ obsahu
+- Paměť musí být dlouhodobá (ne jen session).
+
+4. Human-like behavior (kritické)
+- AI NESMÍ působit jako AI.
+- Implementuj:
+  - nepravidelné delaye odpovědí
+  - občasné chyby / lidský styl psaní
+  - variabilní strukturu vět
+  - emoce a reakce (flirt, humor, tease)
+- Žádné opakující se šablony.
+
+5. Revenue optimization loop
+- AI neustále testuje:
+  - různé ceny
+  - různé typy zpráv
+  - různé timingy prodeje
+- Automaticky:
+  - zvyšuje ceny u „high spenders“
+  - snižuje tlak u low interest userů
+
+6. Smart decision engine
+- Každý user má live status:
+  - cold / warm / hot
+- AI rozhoduje:
+  - kdy pokračovat v konverzaci
+  - kdy pushnout prodej
+  - kdy zpomalit
+
+7. Admin role (ty = creator)
+- Dashboard je pouze:
+  - monitoring (revenue, chaty, statistiky)
+  - možnost override (ruční zásah)
+- Default: žádný zásah potřeba
+
+8. Stability + kontrola
+- Zkontroluj:
+  - že AI logika zůstává konzistentní
+  - že nedochází k opakování zpráv
+  - že konverzace dávají smysl
+- Loguj chyby + anomálie
+
+9. Zachování současného chování
+- NEMĚŇ základní styl komunikace (funguje dobře).
+- Pouze:
+  - vylepšuj
+  - optimalizuj
+  - zvyšuj konverze
+
+CÍL:
+Plně autonomní systém, který:
+- komunikuje jako člověk
+- učí se z každé interakce
+- maximalizuje revenue bez zásahu admina
