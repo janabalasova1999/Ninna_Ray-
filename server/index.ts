@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { registerRoutes } from "./routes";
@@ -16,7 +17,7 @@ declare module "express-session" {
   }
 }
 
-const app = express();
+export const app = express();
 const isProd = process.env.NODE_ENV === "production";
 if (isProd) app.set("trust proxy", 1);
 
@@ -151,9 +152,9 @@ async function initStripe() {
   }
 
   const PORT = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(PORT, "0.0.0.0", () => {
+  if (!process.env.VERCEL) httpServer.listen(PORT, "0.0.0.0", () => {
     log(`serving on port ${PORT}`);
     initStripe().catch(e => console.error("Stripe init error:", e));
     import("./manager-engine").then(m => m.startManagerEngine()).catch(e => console.error("Manager engine failed to start:", e));
-  });
+    });
 })();
